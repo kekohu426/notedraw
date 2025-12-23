@@ -1,11 +1,18 @@
 import mammoth from 'mammoth';
-import * as pdfjsLib from 'pdfjs-dist';
 
-// Set up the worker source
-// Using unpkg for the worker to avoid build setup complexity
-// Ensure the version matches the installed version
-if (typeof window !== 'undefined') {
+// pdfjs-dist will be dynamically imported to avoid SSR issues
+let pdfjsLib: typeof import('pdfjs-dist') | null = null;
+
+async function getPdfjs() {
+  if (pdfjsLib) return pdfjsLib;
+
+  if (typeof window === 'undefined') {
+    throw new Error('PDF parsing is only available in the browser');
+  }
+
+  pdfjsLib = await import('pdfjs-dist');
   pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+  return pdfjsLib;
 }
 
 export async function parseFile(file: File): Promise<string> {
@@ -46,10 +53,11 @@ async function parseDocx(file: File): Promise<string> {
 
 async function parsePdf(file: File): Promise<string> {
   try {
+    const pdfjs = await getPdfjs();
     const arrayBuffer = await file.arrayBuffer();
-    
+
     // Loading the document
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
     const pdf = await loadingTask.promise;
     
     let fullText = '';

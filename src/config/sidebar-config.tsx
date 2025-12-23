@@ -93,6 +93,12 @@ export function useSidebarLinks(): NestedMenuItem[] {
       authorizeOnly: ['admin'],
       items: [
         {
+          title: t('admin.orders.title'),
+          icon: <CreditCardIcon className="size-4 shrink-0" />,
+          href: Routes.AdminOrders,
+          external: false,
+        },
+        {
           title: t('admin.dashboard.title'),
           icon: <LayoutDashboardIcon className="size-4 shrink-0" />,
           href: Routes.AdminDashboard,
@@ -102,12 +108,6 @@ export function useSidebarLinks(): NestedMenuItem[] {
           title: t('admin.users.title'),
           icon: <UsersIcon className="size-4 shrink-0" />,
           href: Routes.AdminUsers,
-          external: false,
-        },
-        {
-          title: t('admin.orders.title'),
-          icon: <CreditCardIcon className="size-4 shrink-0" />,
-          href: Routes.AdminOrders,
           external: false,
         },
         {

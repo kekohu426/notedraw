@@ -26,8 +26,16 @@ export interface PaintOptions {
 }
 
 const MAX_RETRIES = 2;
-const POLL_INTERVAL = 2000; // 2秒轮询一次
-const MAX_POLL_ATTEMPTS = 60; // 最多轮询60次（2分钟）
+// 优化：使用指数退避轮询，初始更快，后续逐渐放慢
+const INITIAL_POLL_INTERVAL = 1000; // 初始1秒
+const MAX_POLL_INTERVAL = 5000; // 最大5秒
+const MAX_POLL_ATTEMPTS = 30; // 减少到30次（约1分钟）
+
+// 计算轮询间隔（指数退避）
+function getPollInterval(attempt: number): number {
+  const interval = INITIAL_POLL_INTERVAL * Math.pow(1.3, attempt);
+  return Math.min(interval, MAX_POLL_INTERVAL);
+}
 
 // ============ Gemini API (NanoBanana) ============
 
@@ -50,8 +58,6 @@ async function paintWithGemini(options: PaintOptions): Promise<PaintResult> {
     const model = 'gemini-3-pro-image-preview';
     const url = `${baseUrl}/models/${model}:generateContent`;
 
-    console.log('[Painter] Gemini API request to:', url);
-
     const requestBody = {
       contents: [
         {
@@ -65,8 +71,6 @@ async function paintWithGemini(options: PaintOptions): Promise<PaintResult> {
       }
     };
 
-    console.log('[Painter] Gemini request body:', JSON.stringify(requestBody, null, 2));
-
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -77,8 +81,6 @@ async function paintWithGemini(options: PaintOptions): Promise<PaintResult> {
     });
 
     const responseText = await response.text();
-    console.log('[Painter] Gemini response status:', response.status);
-    console.log('[Painter] Gemini response:', responseText.substring(0, 500));
 
     if (!response.ok) {
       return {
@@ -114,8 +116,6 @@ async function paintWithGemini(options: PaintOptions): Promise<PaintResult> {
         const mimeType = part.inlineData.mimeType || 'image/png';
         const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
-        console.log('[Painter] Gemini image generated successfully');
-
         return {
           success: true,
           imageBase64: base64Data,
@@ -127,7 +127,6 @@ async function paintWithGemini(options: PaintOptions): Promise<PaintResult> {
     // 如果没有 inlineData，检查是否有 fileData（URL 格式）
     for (const part of parts) {
       if (part.fileData && part.fileData.fileUri) {
-        console.log('[Painter] Gemini image URL:', part.fileData.fileUri);
         return {
           success: true,
           imageUrl: part.fileData.fileUri,
@@ -187,8 +186,6 @@ async function createImageTask(
     n: 1,
   };
 
-  console.log('[Painter] Creating image task:', JSON.stringify(requestBody, null, 2));
-
   const response = await fetch(`${baseUrl}/images/generations`, {
     method: 'POST',
     headers: {
@@ -199,10 +196,9 @@ async function createImageTask(
   });
 
   const responseText = await response.text();
-  console.log('[Painter] Create task response:', response.status, responseText);
 
   if (!response.ok) {
-    return { success: false, error: `API error: ${response.status} - ${responseText}` };
+    return { success: false, error: `API error: ${response.status}` };
   }
 
   try {
@@ -218,9 +214,9 @@ async function createImageTask(
       return { success: true, taskId: data.task_id };
     }
 
-    return { success: false, error: `Unexpected response format: ${responseText}` };
+    return { success: false, error: 'Unexpected response format' };
   } catch (e) {
-    return { success: false, error: `Failed to parse response: ${responseText}` };
+    return { success: false, error: 'Failed to parse response' };
   }
 }
 
@@ -234,7 +230,6 @@ async function queryTaskStatus(
 ): Promise<{ status: string; imageUrl?: string; error?: string }> {
   // apimart.ai 使用 /tasks/{task_id} 端点
   const queryUrl = `${baseUrl}/tasks/${encodeURIComponent(taskId)}`;
-  console.log('[Painter] Querying task status:', queryUrl);
 
   const response = await fetch(queryUrl, {
     method: 'GET',
@@ -244,7 +239,6 @@ async function queryTaskStatus(
   });
 
   const responseText = await response.text();
-  console.log('[Painter] Query response:', response.status, responseText);
 
   if (!response.ok) {
     return { status: 'error', error: `Query error: ${response.status}` };
@@ -252,14 +246,12 @@ async function queryTaskStatus(
 
   try {
     const data = JSON.parse(responseText);
-    console.log('[Painter] Task data:', JSON.stringify(data, null, 2));
 
     // apimart.ai 返回嵌套结构: { code: 200, data: { status: "pending", ... } }
     const taskData = data.data || data;
 
     // 检查不同的状态字段名
     const status = taskData.status || taskData.state || data.status || 'unknown';
-    console.log('[Painter] Parsed status:', status);
 
     if (status === 'completed' || status === 'success' || status === 'succeeded') {
       // apimart.ai 响应格式: { result: { images: [{ url: ["https://..."] }] } }
@@ -289,8 +281,6 @@ async function queryTaskStatus(
         imageUrl = imageUrl[0];
       }
 
-      console.log('[Painter] Found image URL:', imageUrl);
-
       if (imageUrl) {
         return { status: 'completed', imageUrl };
       }
@@ -304,22 +294,18 @@ async function queryTaskStatus(
         }
       }
 
-      console.error('[Painter] Completed but no image URL found in:', JSON.stringify(taskData, null, 2));
       return { status: 'completed', error: 'No image URL in response' };
     }
 
     if (status === 'failed' || status === 'error') {
       const errorMsg = taskData.error || taskData.message || data.error || data.message || 'Task failed';
-      console.log('[Painter] Task failed:', errorMsg);
       return { status: 'failed', error: errorMsg };
     }
 
     // 还在处理中 (pending, processing, running 等)
-    console.log('[Painter] Task still processing, status:', status);
     return { status: 'processing' };
   } catch (e) {
-    console.error('[Painter] Parse error:', e);
-    return { status: 'error', error: `Failed to parse status: ${responseText}` };
+    return { status: 'error', error: 'Failed to parse status response' };
   }
 }
 
@@ -351,17 +337,15 @@ async function paintWithApimart(options: PaintOptions): Promise<PaintResult> {
       };
     }
 
-    console.log('[Painter] Task created:', createResult.taskId);
-
-    // 2. 轮询任务状态
+    // 2. 轮询任务状态（使用指数退避）
     for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
-      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+      const interval = getPollInterval(i);
+      await new Promise(resolve => setTimeout(resolve, interval));
 
       const statusResult = await queryTaskStatus(apiKey, baseUrl, createResult.taskId);
 
       if (statusResult.status === 'completed') {
         if (statusResult.imageUrl) {
-          console.log('[Painter] Image generated:', statusResult.imageUrl);
           return {
             success: true,
             imageUrl: statusResult.imageUrl,
@@ -379,9 +363,7 @@ async function paintWithApimart(options: PaintOptions): Promise<PaintResult> {
           errorMessage: statusResult.error || 'Task failed',
         };
       }
-
       // 继续轮询
-      console.log(`[Painter] Still processing... (${i + 1}/${MAX_POLL_ATTEMPTS})`);
     }
 
     return {
@@ -389,7 +371,6 @@ async function paintWithApimart(options: PaintOptions): Promise<PaintResult> {
       errorMessage: 'Timeout waiting for image generation',
     };
   } catch (error) {
-    console.error('[Painter] Error:', error);
     return {
       success: false,
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
@@ -414,9 +395,6 @@ async function paintWithCustomProvider(options: PaintOptions): Promise<PaintResu
   const baseUrl = customConfig.baseUrl.replace(/\/$/, ''); // 移除末尾斜杠
   const model = customConfig.model || options.imageModel || 'gpt-4o-image';
 
-  console.log(`[Painter] Using custom provider: ${customConfig.name || 'Custom'}`);
-  console.log(`[Painter] Base URL: ${baseUrl}, Model: ${model}`);
-
   try {
     const aspectRatio = getAspectRatio(options.width, options.height);
 
@@ -430,17 +408,15 @@ async function paintWithCustomProvider(options: PaintOptions): Promise<PaintResu
       };
     }
 
-    console.log('[Painter] Custom provider task created:', createResult.taskId);
-
-    // 2. 轮询任务状态
+    // 2. 轮询任务状态（使用指数退避）
     for (let i = 0; i < MAX_POLL_ATTEMPTS; i++) {
-      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL));
+      const interval = getPollInterval(i);
+      await new Promise(resolve => setTimeout(resolve, interval));
 
       const statusResult = await queryTaskStatus(apiKey, baseUrl, createResult.taskId);
 
       if (statusResult.status === 'completed') {
         if (statusResult.imageUrl) {
-          console.log('[Painter] Custom provider image generated:', statusResult.imageUrl);
           return {
             success: true,
             imageUrl: statusResult.imageUrl,
@@ -458,8 +434,7 @@ async function paintWithCustomProvider(options: PaintOptions): Promise<PaintResu
           errorMessage: statusResult.error || 'Task failed',
         };
       }
-
-      console.log(`[Painter] Custom provider still processing... (${i + 1}/${MAX_POLL_ATTEMPTS})`);
+      // 继续轮询
     }
 
     return {
@@ -467,7 +442,6 @@ async function paintWithCustomProvider(options: PaintOptions): Promise<PaintResu
       errorMessage: 'Timeout waiting for image generation',
     };
   } catch (error) {
-    console.error('[Painter] Custom provider error:', error);
     return {
       success: false,
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
@@ -492,18 +466,15 @@ async function paintWithProvider(options: PaintOptions): Promise<PaintResult> {
       return paintWithCustomProvider(options);
 
     case 'openai':
-      // TODO: 实现 OpenAI 官方 API
-      console.log('[Painter] OpenAI provider not yet implemented, falling back to gemini');
+      // 暂未实现，回退到gemini
       return paintWithGemini(options);
 
     case 'fal':
-      // TODO: 实现 Fal.ai API
-      console.log('[Painter] Fal.ai provider not yet implemented, falling back to gemini');
+      // 暂未实现，回退到gemini
       return paintWithGemini(options);
 
     case 'replicate':
-      // TODO: 实现 Replicate API
-      console.log('[Painter] Replicate provider not yet implemented, falling back to gemini');
+      // 暂未实现，回退到gemini
       return paintWithGemini(options);
 
     default:
@@ -512,10 +483,53 @@ async function paintWithProvider(options: PaintOptions): Promise<PaintResult> {
 }
 
 /**
+ * 生成占位图片（开发模式）
+ * 返回一个带有提示词文字的SVG占位图
+ */
+function generatePlaceholderImage(prompt: string): string {
+  const truncatedPrompt = prompt.length > 200 ? prompt.substring(0, 200) + '...' : prompt;
+  const escapedPrompt = truncatedPrompt
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f0f9ff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e0f2fe;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bg)"/>
+  <rect x="20" y="20" width="760" height="560" rx="16" fill="white" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8,4"/>
+  <text x="400" y="80" text-anchor="middle" font-family="system-ui, sans-serif" font-size="24" font-weight="bold" fill="#0369a1">🎨 开发占位模式</text>
+  <text x="400" y="120" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" fill="#64748b">DEV_PLACEHOLDER_MODE=true</text>
+  <line x1="60" y1="150" x2="740" y2="150" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="60" y="180" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#334155">生成提示词 (Prompt):</text>
+  <foreignObject x="60" y="200" width="680" height="340">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: monospace; font-size: 12px; color: #475569; word-wrap: break-word; white-space: pre-wrap; line-height: 1.5; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">${escapedPrompt}</div>
+  </foreignObject>
+</svg>`.trim();
+
+  const base64 = Buffer.from(svg).toString('base64');
+  return `data:image/svg+xml;base64,${base64}`;
+}
+
+/**
  * 主绘图函数（带重试）
  */
 export async function paint(options: PaintOptions): Promise<PaintResult> {
-  console.log(`[Painter] Using provider: ${options.apiProvider || 'apimart'}, model: ${options.imageModel || 'gpt-4o-image'}`);
+  // 开发占位模式：跳过真实API调用
+  if (process.env.DEV_PLACEHOLDER_MODE === 'true') {
+    console.log('[Painter] DEV_PLACEHOLDER_MODE: returning placeholder image');
+    const placeholderUrl = generatePlaceholderImage(options.prompt);
+    return {
+      success: true,
+      imageUrl: placeholderUrl,
+    };
+  }
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const result = await paintWithProvider(options);

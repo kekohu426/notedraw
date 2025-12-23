@@ -19,6 +19,16 @@ export function useNavbarLinks(): NestedMenuItem[] {
 
   return [
     {
+      title: t('createNote.title'),
+      href: Routes.NoteDraw,
+      external: false,
+    },
+    {
+      title: t('plaza.title'),
+      href: Routes.Plaza,
+      external: false,
+    },
+    {
       title: t('blog.title'),
       href: Routes.Blog,
       external: false,

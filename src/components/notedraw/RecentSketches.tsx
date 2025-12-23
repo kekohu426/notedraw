@@ -65,7 +65,17 @@ export function RecentSketches({ locale = 'en', maxItems = 4 }: RecentSketchesPr
   }
 
   if (projects.length === 0) {
-    return null;
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Clock className="h-4 w-4" />
+          <span>{locale === 'zh' ? '最近生成' : 'Recent Sketches'}</span>
+        </div>
+        <div className="rounded-lg border bg-muted/20 p-4 text-center text-xs text-muted-foreground">
+          {locale === 'zh' ? '暂无生成记录' : 'No recent sketches'}
+        </div>
+      </div>
+    );
   }
 
   return (

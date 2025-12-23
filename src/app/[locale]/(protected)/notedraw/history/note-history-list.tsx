@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Eye, Trash2, Plus, ImageIcon, Clock, CheckCircle, XCircle, Loader2, Calendar, FileText } from 'lucide-react';
+import { Eye, Trash2, Plus, ImageIcon, Clock, CheckCircle, XCircle, Loader2, Calendar, FileText, Share2, Globe, GlobeLock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,9 +30,17 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { getUserProjectsAction, deleteProjectAction } from '@/actions/notedraw';
+import { removeFromPlazaAction } from '@/actions/plaza';
 import { LocaleLink } from '@/i18n/navigation';
 import { Routes } from '@/routes';
 import { ResultGallery } from '@/components/notedraw/ResultGallery';
+import { ShareToPlazaDialog } from '@/components/plaza/share-to-plaza-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface NoteCard {
   id: string;
@@ -52,6 +60,8 @@ interface NoteProject {
   visualStyle: string;
   status: string;
   errorMessage: string | null;
+  isPublic: boolean;
+  slug: string | null;
   createdAt: Date;
   updatedAt: Date;
   _count: {
@@ -69,6 +79,10 @@ export function NoteHistoryList({ locale }: NoteHistoryListProps) {
   const [projects, setProjects] = useState<NoteProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareProjectId, setShareProjectId] = useState<string | null>(null);
+  const [shareProjectTitle, setShareProjectTitle] = useState<string>('');
+  const [removingFromPlazaId, setRemovingFromPlazaId] = useState<string | null>(null);
 
   const t = {
     en: {
@@ -95,6 +109,14 @@ export function NoteHistoryList({ locale }: NoteHistoryListProps) {
       historyTitle: 'Note History',
       createNew: 'Create New Note',
       redirecting: 'Redirecting to Studio for editing...',
+      shareToPlaza: 'Share to Plaza',
+      removeFromPlaza: 'Remove from Plaza',
+      removeConfirm: 'Remove this note from the plaza?',
+      removeSuccess: 'Note removed from plaza',
+      removeFail: 'Failed to remove from plaza',
+      publicNote: 'Shared publicly',
+      privateNote: 'Private note',
+      viewInPlaza: 'View in Plaza',
     },
     zh: {
       empty: '暂无笔记',
@@ -120,6 +142,14 @@ export function NoteHistoryList({ locale }: NoteHistoryListProps) {
       historyTitle: '笔记历史',
       createNew: '创建新笔记',
       redirecting: '正在跳转到工作室进行编辑...',
+      shareToPlaza: '分享到广场',
+      removeFromPlaza: '从广场移除',
+      removeConfirm: '确定要从广场移除这个笔记吗？',
+      removeSuccess: '笔记已从广场移除',
+      removeFail: '从广场移除失败',
+      publicNote: '已公开分享',
+      privateNote: '私密笔记',
+      viewInPlaza: '在广场查看',
     },
   };
 
@@ -164,6 +194,41 @@ export function NoteHistoryList({ locale }: NoteHistoryListProps) {
   const handleEdit = (projectId: string) => {
     toast.info(texts.redirecting);
     router.push(`/notedraw/${projectId}`);
+  };
+
+  const handleOpenShareDialog = (project: NoteProject) => {
+    setShareProjectId(project.id);
+    setShareProjectTitle(project.title || project.inputText.slice(0, 30));
+    setShareDialogOpen(true);
+  };
+
+  const handleShareSuccess = (slug: string) => {
+    // Update the project in the list to reflect it's now public
+    setProjects(prev => prev.map(p =>
+      p.id === shareProjectId ? { ...p, isPublic: true, slug } : p
+    ));
+    setShareDialogOpen(false);
+    setShareProjectId(null);
+  };
+
+  const handleRemoveFromPlaza = async (projectId: string) => {
+    setRemovingFromPlazaId(projectId);
+    try {
+      const result = await removeFromPlazaAction({ projectId });
+      if (result?.data?.success) {
+        setProjects(prev => prev.map(p =>
+          p.id === projectId ? { ...p, isPublic: false, slug: null } : p
+        ));
+        toast.success(texts.removeSuccess);
+      } else {
+        throw new Error(result?.data?.error || 'Remove failed');
+      }
+    } catch (error) {
+      console.error('Remove from plaza error:', error);
+      toast.error(texts.removeFail);
+    } finally {
+      setRemovingFromPlazaId(null);
+    }
   };
 
   if (isLoading) {
@@ -227,6 +292,75 @@ export function NoteHistoryList({ locale }: NoteHistoryListProps) {
                   <Eye className="mr-2 h-4 w-4" />
                   {texts.view}
                 </Button>
+
+                {/* Share/Remove from Plaza Button */}
+                {project.status === 'completed' && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        {project.isPublic ? (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="text-green-600"
+                                disabled={removingFromPlazaId === project.id}
+                              >
+                                {removingFromPlazaId === project.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Globe className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>{texts.removeFromPlaza}</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  {texts.removeConfirm}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>{texts.cancel}</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleRemoveFromPlaza(project.id)}>
+                                  {texts.confirm}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleOpenShareDialog(project)}
+                          >
+                            <Share2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {project.isPublic ? texts.publicNote : texts.shareToPlaza}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+
+                {/* View in Plaza Button */}
+                {project.isPublic && project.slug && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" asChild>
+                          <LocaleLink href={`${Routes.PlazaNote}/${project.slug}`} target="_blank">
+                            <Eye className="h-4 w-4" />
+                          </LocaleLink>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{texts.viewInPlaza}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
 
                 <Dialog>
                   <DialogTrigger asChild>
@@ -298,6 +432,17 @@ export function NoteHistoryList({ locale }: NoteHistoryListProps) {
           </div>
         ))}
       </div>
+
+      {/* Share to Plaza Dialog */}
+      {shareProjectId && (
+        <ShareToPlazaDialog
+          open={shareDialogOpen}
+          onOpenChange={setShareDialogOpen}
+          projectId={shareProjectId}
+          projectTitle={shareProjectTitle}
+          onSuccess={handleShareSuccess}
+        />
+      )}
     </div>
   );
 }

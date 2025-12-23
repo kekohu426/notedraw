@@ -1,6 +1,5 @@
 import { createSafeActionClient } from 'next-safe-action';
 import type { User } from './auth-types';
-import { isDemoWebsite } from './demo';
 import { getSession } from './server';
 
 // -----------------------------------------------------------------------------
@@ -28,10 +27,7 @@ export const actionClient = createSafeActionClient({
 export const userActionClient = actionClient.use(async ({ next }) => {
   const session = await getSession();
   if (!session?.user) {
-    return {
-      success: false,
-      error: 'Unauthorized',
-    };
+    throw new Error('Unauthorized');
   }
 
   return next({ ctx: { user: session.user } });
@@ -42,16 +38,18 @@ export const userActionClient = actionClient.use(async ({ next }) => {
 // -----------------------------------------------------------------------------
 export const adminActionClient = userActionClient.use(async ({ next, ctx }) => {
   const user = (ctx as { user: User }).user;
-  const isDemo = isDemoWebsite();
   const isAdmin = user.role === 'admin';
 
-  // If this is a demo website and user is not an admin, allow the request
-  if (!isAdmin && !isDemo) {
-    return {
-      success: false,
-      error: 'Unauthorized',
-    };
+  // 严格检查管理员权限
+  if (!isAdmin) {
+    throw new Error('Unauthorized');
   }
 
   return next({ ctx });
 });
+
+// -----------------------------------------------------------------------------
+// 4. Public client (no authentication required)
+// -----------------------------------------------------------------------------
+export const publicActionClient = actionClient;
+

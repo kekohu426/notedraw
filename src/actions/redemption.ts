@@ -301,7 +301,7 @@ export const updateRedemptionCodeAction = adminActionClient
   });
 
 /**
- * 获取兑换码使用记录
+ * 获取兑换码使用记录（含用户信息）
  */
 export const getCodeRedemptionsAction = adminActionClient
   .schema(z.object({ codeId: z.string() }))
@@ -310,10 +310,22 @@ export const getCodeRedemptionsAction = adminActionClient
 
     try {
       const db = await getDb();
+      const { user } = await import('@/db/schema');
 
       const records = await db
-        .select()
+        .select({
+          id: redemptionRecord.id,
+          codeId: redemptionRecord.codeId,
+          userId: redemptionRecord.userId,
+          code: redemptionRecord.code,
+          type: redemptionRecord.type,
+          value: redemptionRecord.value,
+          redeemedAt: redemptionRecord.redeemedAt,
+          userName: user.name,
+          userEmail: user.email,
+        })
         .from(redemptionRecord)
+        .leftJoin(user, eq(redemptionRecord.userId, user.id))
         .where(eq(redemptionRecord.codeId, codeId))
         .orderBy(desc(redemptionRecord.redeemedAt));
 
@@ -323,6 +335,63 @@ export const getCodeRedemptionsAction = adminActionClient
       };
     } catch (error) {
       console.error('Get code redemptions error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get records',
+      };
+    }
+  });
+
+/**
+ * 获取所有兑换记录（管理员全局视图）
+ */
+export const getAllRedemptionRecordsAction = adminActionClient
+  .schema(z.object({
+    page: z.number().default(1),
+    pageSize: z.number().default(50),
+  }))
+  .action(async ({ parsedInput }) => {
+    const { page, pageSize } = parsedInput;
+
+    try {
+      const db = await getDb();
+      const { user } = await import('@/db/schema');
+
+      // 获取记录
+      const records = await db
+        .select({
+          id: redemptionRecord.id,
+          codeId: redemptionRecord.codeId,
+          userId: redemptionRecord.userId,
+          code: redemptionRecord.code,
+          type: redemptionRecord.type,
+          value: redemptionRecord.value,
+          redeemedAt: redemptionRecord.redeemedAt,
+          userName: user.name,
+          userEmail: user.email,
+        })
+        .from(redemptionRecord)
+        .leftJoin(user, eq(redemptionRecord.userId, user.id))
+        .orderBy(desc(redemptionRecord.redeemedAt))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize);
+
+      // 获取总数
+      const countResult = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(redemptionRecord);
+      const total = Number(countResult[0]?.count || 0);
+
+      return {
+        success: true,
+        records,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      };
+    } catch (error) {
+      console.error('Get all redemption records error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to get records',

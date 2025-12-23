@@ -12,11 +12,14 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { History, Settings, LogOut, User, Moon, Sun } from 'lucide-react';
+import { History, LogOut, User, Moon, Sun, Coins, CreditCard, Loader2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useRouter } from 'next/navigation';
+import { useCreditBalance } from '@/hooks/use-credits';
+import { websiteConfig } from '@/config/website';
 
 export function SimpleHeader() {
   const t = useTranslations();
@@ -24,6 +27,10 @@ export function SimpleHeader() {
   const currentUser = session?.user;
   const { theme, setTheme } = useTheme();
   const router = useRouter();
+
+  // 积分余额
+  const enableCredits = websiteConfig.credits.enableCredits;
+  const { data: balance = 0, isLoading: isLoadingBalance } = useCreditBalance();
 
   const handleLogout = async () => {
     await authClient.signOut();
@@ -44,7 +51,7 @@ export function SimpleHeader() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-14 items-center px-4 gap-4">
         {/* Logo */}
-        <LocaleLink href={Routes.Root} className="flex items-center gap-2">
+        <LocaleLink href={Routes.NoteDraw} className="flex items-center gap-2">
           <Logo className="size-6" />
           <span className="font-semibold text-lg hidden sm:inline-block">
             {t('Metadata.name')}
@@ -56,15 +63,21 @@ export function SimpleHeader() {
 
         {/* 右侧操作区 */}
         <div className="flex items-center gap-2">
-          {/* History 按钮 */}
-          <Button variant="ghost" size="sm" asChild>
-            <LocaleLink href="/notedraw/history">
-              <History className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">
-                {t('Dashboard.notedraw.history.title')}
-              </span>
-            </LocaleLink>
-          </Button>
+          {/* 积分显示 */}
+          {enableCredits && (
+            <Button variant="outline" size="sm" className="h-8 gap-1.5" asChild>
+              <LocaleLink href={Routes.SettingsCredits}>
+                <Coins className="h-4 w-4" />
+                <span>
+                  {isLoadingBalance ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    balance.toLocaleString()
+                  )}
+                </span>
+              </LocaleLink>
+            </Button>
+          )}
 
           {/* 主题切换 */}
           <Button
@@ -90,28 +103,61 @@ export function SimpleHeader() {
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium">{currentUser.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {currentUser.email}
-                  </p>
-                </div>
+              <DropdownMenuContent align="end" className="w-56">
+                {/* 用户信息 */}
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{currentUser.name}</p>
+                    <p className="text-xs leading-none text-muted-foreground truncate">
+                      {currentUser.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+
+                {/* 积分入口 */}
+                {enableCredits && (
+                  <DropdownMenuItem asChild>
+                    <LocaleLink href={Routes.SettingsCredits} className="cursor-pointer">
+                      <Coins className="mr-2 h-4 w-4" />
+                      <span className="flex-1">{t('Dashboard.settings.credits.title')}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {isLoadingBalance ? '...' : balance.toLocaleString()}
+                      </span>
+                    </LocaleLink>
+                  </DropdownMenuItem>
+                )}
+
+                {/* 历史记录 */}
                 <DropdownMenuItem asChild>
-                  <LocaleLink href="/settings/profile">
+                  <LocaleLink href="/notedraw/history" className="cursor-pointer">
+                    <History className="mr-2 h-4 w-4" />
+                    {t('Dashboard.notedraw.history.title')}
+                  </LocaleLink>
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
+                {/* 个人设置 */}
+                <DropdownMenuItem asChild>
+                  <LocaleLink href={Routes.SettingsProfile} className="cursor-pointer">
                     <User className="mr-2 h-4 w-4" />
                     {t('Dashboard.settings.profile.title')}
                   </LocaleLink>
                 </DropdownMenuItem>
+
+                {/* 账单设置 */}
                 <DropdownMenuItem asChild>
-                  <LocaleLink href="/settings/billing">
-                    <Settings className="mr-2 h-4 w-4" />
-                    {t('Dashboard.settings.title')}
+                  <LocaleLink href={Routes.SettingsBilling} className="cursor-pointer">
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    {t('Dashboard.settings.billing.title')}
                   </LocaleLink>
                 </DropdownMenuItem>
+
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
+
+                {/* 登出 */}
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
                   {t('Common.logout')}
                 </DropdownMenuItem>

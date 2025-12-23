@@ -1,4 +1,4 @@
-import { betterFetch } from '@better-fetch/fetch';
+
 import createMiddleware from 'next-intl/middleware';
 import { type NextRequest, NextResponse } from 'next/server';
 import {
@@ -7,8 +7,7 @@ import {
   LOCALE_COOKIE_NAME,
   routing,
 } from './i18n/routing';
-import type { Session } from './lib/auth-types';
-import { getBaseUrl } from './lib/urls/urls';
+
 import {
   DEFAULT_LOGIN_REDIRECT,
   protectedRoutes,
@@ -29,7 +28,7 @@ const intlMiddleware = createMiddleware(routing);
  */
 export default async function middleware(req: NextRequest) {
   const { nextUrl } = req;
-  console.log('>> middleware start, pathname', nextUrl.pathname);
+  // console.log('>> middleware start, pathname', nextUrl.pathname);
 
   // Handle internal docs link redirection for internationalization
   // Check if this is a docs page without locale prefix
@@ -45,31 +44,23 @@ export default async function middleware(req: NextRequest) {
       LOCALES.includes(preferredLocale)
     ) {
       const localizedPath = `/${preferredLocale}${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
-      console.log(
-        '<< middleware end, redirecting docs link to preferred locale:',
-        localizedPath
-      );
+      // console.log(
+      //   '<< middleware end, redirecting docs link to preferred locale:',
+      //   localizedPath
+      // );
       return NextResponse.redirect(new URL(localizedPath, nextUrl));
     }
   }
 
-  // do not use getSession() here, it will cause error related to edge runtime
-  // const session = await getSession();
+  // Check for session token in cookies (non-blocking)
+  // This is an optimistic check. The actual session validation will happen in the page/layout.
+  // We check for both standard and secure cookies to cover dev/prod environments
+  const sessionToken =
+    req.cookies.get('better-auth.session_token') ||
+    req.cookies.get('__Secure-better-auth.session_token');
 
-  // Use the request's origin to avoid port mismatch in development
-  const baseURL = `${nextUrl.protocol}//${nextUrl.host}`;
-
-  const { data: session } = await betterFetch<Session>(
-    '/api/auth/get-session',
-    {
-      baseURL,
-      headers: {
-        cookie: req.headers.get('cookie') || '', // Forward the cookies from the request
-      },
-    }
-  );
-  const isLoggedIn = !!session;
-  // console.log('middleware, isLoggedIn', isLoggedIn);
+  const isLoggedIn = !!sessionToken;
+  // console.log('middleware, isLoggedIn (cookie check)', isLoggedIn);
 
   // Get the pathname of the request (e.g. /zh/dashboard to /dashboard)
   const pathnameWithoutLocale = getPathnameWithoutLocale(
@@ -83,9 +74,9 @@ export default async function middleware(req: NextRequest) {
       new RegExp(`^${route}$`).test(pathnameWithoutLocale)
     );
     if (isNotAllowedRoute) {
-      console.log(
-        '<< middleware end, not allowed route, already logged in, redirecting to dashboard'
-      );
+      // console.log(
+      //   '<< middleware end, not allowed route, already logged in, redirecting to dashboard'
+      // );
       return NextResponse.redirect(new URL(DEFAULT_LOGIN_REDIRECT, nextUrl));
     }
   }
@@ -102,17 +93,17 @@ export default async function middleware(req: NextRequest) {
       callbackUrl += nextUrl.search;
     }
     const encodedCallbackUrl = encodeURIComponent(callbackUrl);
-    console.log(
-      '<< middleware end, not logged in, redirecting to login, callbackUrl',
-      callbackUrl
-    );
+    // console.log(
+    //   '<< middleware end, not logged in, redirecting to login, callbackUrl',
+    //   callbackUrl
+    // );
     return NextResponse.redirect(
       new URL(`/auth/login?callbackUrl=${encodedCallbackUrl}`, nextUrl)
     );
   }
 
   // Apply intlMiddleware for all routes
-  console.log('<< middleware end, applying intlMiddleware');
+  // console.log('<< middleware end, applying intlMiddleware');
   return intlMiddleware(req);
 }
 

@@ -8,6 +8,43 @@ import {
   addSubscriptionCredits,
 } from '@/credits/credits';
 import { CREDIT_TRANSACTION_TYPE } from '@/credits/types';
+import { createHmac, timingSafeEqual } from 'crypto';
+
+/**
+ * Verify Creem webhook signature using HMAC-SHA256
+ * This prevents attackers from sending fake webhook events
+ */
+function verifyCreemSignature(payload: string, signature: string, secret: string): boolean {
+  if (!signature || !secret) {
+    console.warn('Creem webhook: Missing signature or secret');
+    return false;
+  }
+
+  try {
+    // Creem typically sends signature as "sha256=<hash>" or just the hash
+    const receivedSig = signature.startsWith('sha256=')
+      ? signature.slice(7)
+      : signature;
+
+    // Generate expected signature using HMAC-SHA256
+    const expectedSig = createHmac('sha256', secret)
+      .update(payload, 'utf8')
+      .digest('hex');
+
+    // Use timing-safe comparison to prevent timing attacks
+    const receivedBuffer = Buffer.from(receivedSig, 'hex');
+    const expectedBuffer = Buffer.from(expectedSig, 'hex');
+
+    if (receivedBuffer.length !== expectedBuffer.length) {
+      return false;
+    }
+
+    return timingSafeEqual(receivedBuffer, expectedBuffer);
+  } catch (error) {
+    console.error('Creem signature verification error:', error);
+    return false;
+  }
+}
 
 interface CreemCheckoutSession {
   id: string;
@@ -232,9 +269,23 @@ export class CreemProvider implements PaymentProvider {
   }
 
   async handleWebhookEvent(payload: string, signature: string): Promise<void> {
-    // In a real implementation, you MUST verify the signature
-    // verifySignature(payload, signature, this.webhookSecret);
-    
+    // Verify webhook signature for security
+    // Skip verification only in development if no secret is configured
+    if (this.webhookSecret) {
+      const isValid = verifyCreemSignature(payload, signature, this.webhookSecret);
+      if (!isValid) {
+        console.error('Creem webhook signature verification failed');
+        throw new Error('Invalid webhook signature');
+      }
+      console.log('Creem webhook signature verified successfully');
+    } else if (process.env.NODE_ENV === 'production') {
+      // In production, require webhook secret
+      console.error('CREEM_WEBHOOK_SECRET is not configured in production');
+      throw new Error('Webhook secret not configured');
+    } else {
+      console.warn('Creem webhook: Skipping signature verification in development (no secret configured)');
+    }
+
     const event = JSON.parse(payload);
     
     try {

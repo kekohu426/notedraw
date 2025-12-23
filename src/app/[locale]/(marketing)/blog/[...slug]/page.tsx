@@ -10,6 +10,8 @@ import { formatDate } from '@/lib/formatter';
 import { constructMetadata } from '@/lib/metadata';
 import { checkPremiumAccess } from '@/lib/premium-access';
 import { getSession } from '@/lib/server';
+import { getBaseUrl, getImageUrl } from '@/lib/urls/urls';
+import { defaultMessages } from '@/i18n/messages';
 import {
   type BlogType,
   authorSource,
@@ -111,8 +113,48 @@ export default async function BlogPostPage(props: BlogPostPageProps) {
   // get related posts
   const relatedPosts = await getRelatedPosts(post);
 
+  // Generate JSON-LD structured data for SEO
+  const baseUrl = getBaseUrl();
+  const articleUrl = `${baseUrl}/${locale}/blog/${slug.join('/')}`;
+  const imageUrl = image ? getImageUrl(image).toString() : undefined;
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: title,
+    description: description,
+    image: imageUrl,
+    datePublished: date,
+    dateModified: date,
+    author: {
+      '@type': 'Person',
+      name: blogAuthor?.data.name || author,
+      ...(blogAuthor?.data.avatar && {
+        image: getImageUrl(blogAuthor.data.avatar).toString(),
+      }),
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: defaultMessages.Metadata.name,
+      logo: {
+        '@type': 'ImageObject',
+        url: `${baseUrl}/logo.png`,
+      },
+    },
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': articleUrl,
+    },
+    keywords: categories.join(', '),
+  };
+
   return (
     <div className="flex flex-col gap-8">
+      {/* JSON-LD structured data for SEO */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* content section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* left column (blog post content) */}

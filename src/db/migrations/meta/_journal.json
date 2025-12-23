@@ -57,6 +57,20 @@
       "when": 1765871559691,
       "tag": "0007_organic_blue_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1766124917626,
+      "tag": "0008_steady_maginty",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1766132280335,
+      "tag": "0009_clumsy_invisible_woman",
+      "breakpoints": true
     }
   ]
 }

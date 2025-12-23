@@ -3,7 +3,7 @@ import {
   addMonthlyFreeCredits,
   addRegisterGiftCredits,
 } from '@/credits/credits';
-import { getDb } from '@/db/index';
+import { getDbSync } from '@/db/index';
 import { defaultMessages } from '@/i18n/messages';
 import { LOCALE_COOKIE_NAME, routing } from '@/i18n/routing';
 import { sendEmail } from '@/mail';
@@ -22,11 +22,14 @@ import { getBaseUrl, getUrlWithLocaleInCallbackUrl } from './urls/urls';
  * docs:
  * https://mksaas.com/docs/auth
  * https://www.better-auth.com/docs/reference/options
+ *
+ * Note: Using getDbSync() instead of await getDb() to avoid top-level await
+ * which blocks module loading. postgres-js creates connections lazily.
  */
 export const auth = betterAuth({
   baseURL: getBaseUrl(),
   appName: defaultMessages.Metadata.name,
-  database: drizzleAdapter(await getDb(), {
+  database: drizzleAdapter(getDbSync(), {
     provider: 'pg', // or "mysql", "sqlite"
   }),
   session: {

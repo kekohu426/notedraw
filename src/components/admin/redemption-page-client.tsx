@@ -30,11 +30,12 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Copy, RefreshCw, Ban, Check } from 'lucide-react';
+import { Plus, Copy, RefreshCw, Ban, Check, Eye, Loader2 } from 'lucide-react';
 import {
   createRedemptionCodesAction,
   getRedemptionCodesAction,
   updateRedemptionCodeAction,
+  getCodeRedemptionsAction,
 } from '@/actions/redemption';
 
 interface RedemptionCode {
@@ -50,12 +51,30 @@ interface RedemptionCode {
   createdAt: Date;
 }
 
+interface RedemptionRecord {
+  id: string;
+  codeId: string;
+  userId: string;
+  code: string;
+  type: string;
+  value: number;
+  redeemedAt: Date;
+  userName: string | null;
+  userEmail: string | null;
+}
+
 export function RedemptionPageClient() {
   const [codes, setCodes] = useState<RedemptionCode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newCodes, setNewCodes] = useState<string[]>([]);
+
+  // 详情对话框状态
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [selectedCode, setSelectedCode] = useState<RedemptionCode | null>(null);
+  const [redemptionRecords, setRedemptionRecords] = useState<RedemptionRecord[]>([]);
+  const [isLoadingRecords, setIsLoadingRecords] = useState(false);
 
   // 创建表单状态
   const [formData, setFormData] = useState({
@@ -134,6 +153,27 @@ export function RedemptionPageClient() {
   const copyAllCodes = () => {
     navigator.clipboard.writeText(newCodes.join('\n'));
     toast.success('已复制所有兑换码');
+  };
+
+  // 查看使用详情
+  const handleViewDetails = async (code: RedemptionCode) => {
+    setSelectedCode(code);
+    setDetailDialogOpen(true);
+    setIsLoadingRecords(true);
+
+    try {
+      const result = await getCodeRedemptionsAction({ codeId: code.id });
+      if (result?.data?.success) {
+        setRedemptionRecords(result.data.records as RedemptionRecord[]);
+      } else {
+        toast.error('加载使用记录失败');
+      }
+    } catch (error) {
+      console.error('Load records error:', error);
+      toast.error('加载使用记录失败');
+    } finally {
+      setIsLoadingRecords(false);
+    }
   };
 
   const typeLabels: Record<string, string> = {
@@ -419,13 +459,25 @@ export function RedemptionPageClient() {
                     {new Date(code.createdAt).toLocaleDateString('zh-CN')}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleToggleActive(code.id, code.isActive)}
-                    >
-                      {code.isActive ? '禁用' : '启用'}
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      {code.usedCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewDetails(code)}
+                          title="查看使用记录"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleToggleActive(code.id, code.isActive)}
+                      >
+                        {code.isActive ? '禁用' : '启用'}
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -433,6 +485,57 @@ export function RedemptionPageClient() {
           </TableBody>
         </Table>
       </div>
+
+      {/* 使用记录详情对话框 */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>使用记录详情</DialogTitle>
+            <DialogDescription>
+              {selectedCode && (
+                <span>
+                  兑换码: <code className="font-mono bg-muted px-1 rounded">{selectedCode.code}</code>
+                  <br />
+                  类型: {typeLabels[selectedCode.type]} {selectedCode.value}
+                  {' | '}使用: {selectedCode.usedCount} / {selectedCode.maxUses}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoadingRecords ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : redemptionRecords.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              暂无使用记录
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {redemptionRecords.map((record) => (
+                <div
+                  key={record.id}
+                  className="flex items-center justify-between p-3 rounded-lg border"
+                >
+                  <div>
+                    <p className="font-medium">{record.userName || '未知用户'}</p>
+                    <p className="text-sm text-muted-foreground">{record.userEmail}</p>
+                  </div>
+                  <div className="text-right">
+                    <Badge className={typeColors[record.type]}>
+                      +{record.value} {typeLabels[record.type]}
+                    </Badge>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(record.redeemedAt).toLocaleString('zh-CN')}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

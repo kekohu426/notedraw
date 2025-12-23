@@ -30,6 +30,10 @@ import {
     PenLineIcon,
     ShieldIcon,
     ArrowLeftIcon,
+    CreditCardIcon,
+    CoinsIcon,
+    SettingsIcon,
+    GlobeIcon,
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
@@ -47,6 +51,12 @@ function useAdminSidebarLinks(): NestedMenuItem[] {
             external: false,
         },
         {
+            title: t('admin.orders.title'),
+            icon: <CreditCardIcon className="size-4 shrink-0" />,
+            href: Routes.AdminOrders,
+            external: false,
+        },
+        {
             title: t('admin.users.title'),
             icon: <UsersIcon className="size-4 shrink-0" />,
             href: Routes.AdminUsers,
@@ -59,6 +69,18 @@ function useAdminSidebarLinks(): NestedMenuItem[] {
             external: false,
         },
         {
+            title: t('admin.credits.title'),
+            icon: <CoinsIcon className="size-4 shrink-0" />,
+            href: Routes.AdminCredits,
+            external: false,
+        },
+        {
+            title: t('admin.plaza.title'),
+            icon: <GlobeIcon className="size-4 shrink-0" />,
+            href: Routes.AdminPlaza,
+            external: false,
+        },
+        {
             title: t('admin.content.title'),
             icon: <FileTextIcon className="size-4 shrink-0" />,
             href: Routes.AdminContent,
@@ -68,6 +90,12 @@ function useAdminSidebarLinks(): NestedMenuItem[] {
             title: t('admin.blog.title'),
             icon: <PenLineIcon className="size-4 shrink-0" />,
             href: Routes.AdminBlog,
+            external: false,
+        },
+        {
+            title: t('admin.settings.title'),
+            icon: <SettingsIcon className="size-4 shrink-0" />,
+            href: Routes.AdminSettings,
             external: false,
         },
     ];
@@ -136,6 +164,18 @@ function AdminSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     );
 }
 
+/**
+ * Admin Console Label Component - uses translations
+ */
+function AdminConsoleLabel() {
+    const t = useTranslations('Dashboard');
+    return (
+        <span className="font-medium text-sm text-muted-foreground">
+            {t('admin.console')}
+        </span>
+    );
+}
+
 interface AdminLayoutClientProps {
     children: React.ReactNode;
 }
@@ -151,9 +191,7 @@ export function AdminLayoutClient({ children }: AdminLayoutClientProps) {
                 <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
                     <SidebarTrigger className="-ml-1" />
                     <Separator orientation="vertical" className="mr-2 h-4" />
-                    <span className="font-medium text-sm text-muted-foreground">
-                        管理控制台
-                    </span>
+                    <AdminConsoleLabel />
                 </header>
                 <main className="flex-1 p-4 lg:p-6">{children}</main>
             </SidebarInset>

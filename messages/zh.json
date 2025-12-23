@@ -10,6 +10,80 @@
       "description": "发现社区创作的精美视觉笔记"
     }
   },
+  "Plaza": {
+    "meta": {
+      "title": "笔记广场 - NoteDraw",
+      "description": "发现社区创作的精美视觉笔记"
+    },
+    "title": "笔记广场",
+    "subtitle": "发现社区创作的精美视觉笔记",
+    "filters": {
+      "all": "全部",
+      "featured": "精选",
+      "latest": "最新",
+      "popular": "热门"
+    },
+    "styles": {
+      "all": "全部风格",
+      "sketch": "手绘",
+      "business": "商务",
+      "cute": "可爱",
+      "minimal": "极简",
+      "chalkboard": "黑板"
+    },
+    "tags": {
+      "title": "热门标签",
+      "all": "全部"
+    },
+    "note": {
+      "views": "{count} 次浏览",
+      "likes": "{count} 个赞",
+      "featured": "精选"
+    },
+    "empty": {
+      "title": "暂无笔记",
+      "description": "还没有人分享笔记，成为第一个分享者吧！"
+    },
+    "detail": {
+      "back": "返回广场",
+      "views": "浏览",
+      "likes": "点赞",
+      "tags": "标签",
+      "publishedAt": "发布于",
+      "cards": "笔记卡片",
+      "download": "下载图片",
+      "share": "分享",
+      "shareSuccess": "链接已复制到剪贴板",
+      "notFound": {
+        "title": "笔记不存在",
+        "description": "您访问的笔记可能已被删除或设为私密"
+      }
+    },
+    "share": {
+      "title": "分享到广场",
+      "description": "将您的笔记分享到广场，让更多人看到",
+      "noteTitle": "笔记标题",
+      "noteTitlePlaceholder": "给您的笔记起个标题",
+      "noteDescription": "笔记描述",
+      "noteDescriptionPlaceholder": "简单描述一下这个笔记的内容（可选）",
+      "tags": "标签",
+      "tagsPlaceholder": "用逗号分隔多个标签（可选）",
+      "agreement": "我同意将此笔记公开展示",
+      "submit": "分享到广场",
+      "submitting": "分享中...",
+      "success": "笔记已分享到广场",
+      "error": "分享失败，请重试",
+      "cancel": "取消"
+    },
+    "remove": {
+      "title": "从广场移除",
+      "description": "确定要从广场移除这个笔记吗？",
+      "confirm": "确认移除",
+      "cancel": "取消",
+      "success": "笔记已从广场移除",
+      "error": "移除失败，请重试"
+    }
+  },
   "Common": {
     "premium": "付费文章",
     "login": "登录",
@@ -321,6 +395,12 @@
   },
   "Marketing": {
     "navbar": {
+      "createNote": {
+        "title": "创建笔记"
+      },
+      "plaza": {
+        "title": "笔记广场"
+      },
       "features": {
         "title": "功能"
       },
@@ -601,12 +681,16 @@
     },
     "admin": {
       "title": "系统管理",
+      "console": "管理控制台",
       "dashboard": {
         "title": "数据概览",
         "description": "应用数据概览"
       },
       "redemption": {
         "title": "兑换码管理"
+      },
+      "credits": {
+        "title": "积分管理"
       },
       "content": {
         "title": "内容审核",
@@ -615,6 +699,14 @@
       "blog": {
         "title": "博客管理",
         "description": "管理您的博客文章和 AI 生成的内容"
+      },
+      "settings": {
+        "title": "系统配置",
+        "description": "管理系统运行参数和功能开关"
+      },
+      "plaza": {
+        "title": "广场管理",
+        "description": "管理广场中公开分享的笔记"
       },
       "users": {
         "title": "用户管理",

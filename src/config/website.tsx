@@ -67,7 +67,7 @@ export const websiteConfig: WebsiteConfig = {
     },
   },
   blog: {
-    enable: false,
+    enable: true,
     paginationSize: 6,
     relatedPostsSize: 3,
   },
@@ -76,8 +76,9 @@ export const websiteConfig: WebsiteConfig = {
   },
   mail: {
     provider: 'resend',
-    fromEmail: 'NoteDraw <onboarding@resend.dev>',
-    supportEmail: 'NoteDraw <onboarding@resend.dev>',
+    // TODO: 上线前请配置正式邮箱域名
+    fromEmail: process.env.MAIL_FROM_EMAIL || 'NoteDraw <noreply@yourdomain.com>',
+    supportEmail: process.env.MAIL_SUPPORT_EMAIL || 'NoteDraw <support@yourdomain.com>',
   },
   newsletter: {
     enable: false,

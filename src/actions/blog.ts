@@ -2,7 +2,7 @@
 
 import { adminActionClient } from '@/lib/safe-action';
 import { z } from 'zod';
-import { writeFile, readdir } from 'fs/promises';
+import { writeFile, readdir, readFile, unlink, access } from 'fs/promises';
 import { join } from 'path';
 
 // GLM API 配置
@@ -28,6 +28,22 @@ const generateBlogSchema = z.object({
 const listBlogsSchema = z.object({
   page: z.number().default(1),
   pageSize: z.number().default(20),
+});
+
+const getBlogSchema = z.object({
+  slug: z.string().min(1),
+  language: z.enum(['en', 'zh']).default('en'),
+});
+
+const updateBlogSchema = z.object({
+  slug: z.string().min(1),
+  language: z.enum(['en', 'zh']).default('en'),
+  content: z.string().min(1),
+});
+
+const deleteBlogSchema = z.object({
+  slug: z.string().min(1),
+  deleteAll: z.boolean().default(true), // 删除所有语言版本
 });
 
 // ============================================================
@@ -129,15 +145,28 @@ First line must be a ## heading title.
 `;
 }
 
+import { slug } from 'github-slugger';
+import Pinyin from 'tiny-pinyin';
+
 /**
  * 生成文件名（slug）
  */
 function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 50);
+  // 1. First check if it contains Chinese characters
+  if (/[\u4e00-\u9fa5]/.test(title)) {
+    // Convert Chinese to Pinyin first
+    const pinyinTitle = Pinyin.convertToPinyin(title, '-', true); // true = remove tone
+    return slug(pinyinTitle);
+  }
+
+  // 2. Use github-slugger for English/mixed titles
+  const safeSlug = slug(title);
+  
+  if (!safeSlug || safeSlug.length < 2) {
+     return `post-${Date.now()}`;
+  }
+  
+  return safeSlug;
 }
 
 /**
@@ -283,6 +312,163 @@ export const listBlogsAction = adminActionClient
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to list blogs',
+      };
+    }
+  });
+
+/**
+ * 获取单篇博客文章内容（用于编辑）
+ */
+export const getBlogAction = adminActionClient
+  .schema(getBlogSchema)
+  .action(async ({ parsedInput }) => {
+    const { slug, language } = parsedInput;
+
+    try {
+      const fileName = language === 'zh' ? `${slug}.zh.mdx` : `${slug}.mdx`;
+      const filePath = join(BLOG_CONTENT_DIR, fileName);
+
+      const content = await readFile(filePath, 'utf-8');
+
+      // 解析 frontmatter 和正文
+      const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+
+      if (frontmatterMatch) {
+        const frontmatter = frontmatterMatch[1];
+        const body = frontmatterMatch[2];
+
+        // 简单解析 frontmatter
+        const titleMatch = frontmatter.match(/title:\s*"([^"]+)"/);
+        const descMatch = frontmatter.match(/description:\s*"([^"]+)"/);
+
+        return {
+          success: true,
+          slug,
+          language,
+          title: titleMatch ? titleMatch[1] : '',
+          description: descMatch ? descMatch[1] : '',
+          frontmatter,
+          body: body.trim(),
+          rawContent: content,
+        };
+      }
+
+      return {
+        success: true,
+        slug,
+        language,
+        title: '',
+        description: '',
+        frontmatter: '',
+        body: content,
+        rawContent: content,
+      };
+
+    } catch (error) {
+      console.error('Get blog error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get blog',
+      };
+    }
+  });
+
+/**
+ * 更新博客文章
+ */
+export const updateBlogAction = adminActionClient
+  .schema(updateBlogSchema)
+  .action(async ({ parsedInput }) => {
+    const { slug, language, content } = parsedInput;
+
+    try {
+      const fileName = language === 'zh' ? `${slug}.zh.mdx` : `${slug}.mdx`;
+      const filePath = join(BLOG_CONTENT_DIR, fileName);
+
+      // 检查文件是否存在
+      try {
+        await access(filePath);
+      } catch {
+        return {
+          success: false,
+          error: `File not found: ${fileName}`,
+        };
+      }
+
+      // 写入更新后的内容
+      await writeFile(filePath, content, 'utf-8');
+
+      return {
+        success: true,
+        message: `Successfully updated ${fileName}`,
+      };
+
+    } catch (error) {
+      console.error('Update blog error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update blog',
+      };
+    }
+  });
+
+/**
+ * 删除博客文章
+ */
+export const deleteBlogAction = adminActionClient
+  .schema(deleteBlogSchema)
+  .action(async ({ parsedInput }) => {
+    const { slug, deleteAll } = parsedInput;
+
+    try {
+      const deletedFiles: string[] = [];
+
+      // 英文版文件
+      const enFileName = `${slug}.mdx`;
+      const enFilePath = join(BLOG_CONTENT_DIR, enFileName);
+
+      // 中文版文件
+      const zhFileName = `${slug}.zh.mdx`;
+      const zhFilePath = join(BLOG_CONTENT_DIR, zhFileName);
+
+      // 删除英文版
+      try {
+        await access(enFilePath);
+        await unlink(enFilePath);
+        deletedFiles.push(enFileName);
+      } catch {
+        // 文件不存在，跳过
+      }
+
+      // 如果需要删除所有语言版本
+      if (deleteAll) {
+        try {
+          await access(zhFilePath);
+          await unlink(zhFilePath);
+          deletedFiles.push(zhFileName);
+        } catch {
+          // 文件不存在，跳过
+        }
+      }
+
+      if (deletedFiles.length === 0) {
+        return {
+          success: false,
+          error: 'No files found to delete',
+        };
+      }
+
+      return {
+        success: true,
+        message: `Successfully deleted: ${deletedFiles.join(', ')}`,
+        deletedFiles,
+      };
+
+    } catch (error) {
+      console.error('Delete blog error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete blog',
       };
     }
   });

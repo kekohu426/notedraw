@@ -5,9 +5,10 @@ import { noteProject, noteCard } from '@/db/schema';
 import { userActionClient } from '@/lib/safe-action';
 import type { User } from '@/lib/auth-types';
 import { consumeCredits, hasEnoughCredits } from '@/credits/credits';
+import { getCreditsForAnalysis, getCreditsForImage } from '@/lib/config-reader';
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, inArray } from 'drizzle-orm';
 import {
   generate,
   regenerateUnit,
@@ -17,10 +18,6 @@ import {
   type NoteUnit,
   type AIConfig,
 } from '@/ai/notedraw';
-
-// Credit 消耗配置
-const CREDITS_FOR_ANALYSIS = 1;
-const CREDITS_FOR_IMAGE = 5;
 
 // ============================================================
 // Schema 定义
@@ -157,25 +154,22 @@ export const generateNotesAction = userActionClient
         return { success: false, error: 'Unauthorized' };
       }
 
-      // 内测阶段暂时跳过积分检查
-      // const estimatedCredits = CREDITS_FOR_ANALYSIS + CREDITS_FOR_IMAGE;
-      // const hasCredits = await hasEnoughCredits({ userId: currentUser.id, requiredCredits: estimatedCredits });
-      // if (!hasCredits) {
-      //   return { success: false, error: 'Insufficient credits' };
-      // }
+      // 获取配置的积分消耗数
+      const creditsForAnalysis = await getCreditsForAnalysis();
+      const creditsForImage = await getCreditsForImage();
+
+      // 预估最少需要的积分（1次分析 + 至少1张图片）
+      const estimatedCredits = creditsForAnalysis + creditsForImage;
+      const hasCredits = await hasEnoughCredits({ userId: currentUser.id, requiredCredits: estimatedCredits });
+      if (!hasCredits) {
+        return { success: false, error: 'Insufficient credits' };
+      }
 
       // 更新项目状态
       await db
         .update(noteProject)
         .set({ status: 'processing', updatedAt: new Date() })
         .where(eq(noteProject.id, projectId));
-
-      // 内测阶段暂时跳过积分消耗
-      // await consumeCredits({
-      //   userId: currentUser.id,
-      //   amount: CREDITS_FOR_ANALYSIS,
-      //   description: 'NoteDraw: Content analysis',
-      // });
 
       // 调用 AI 生成
       const units = await generate({
@@ -188,17 +182,8 @@ export const generateNotesAction = userActionClient
       });
 
       // 保存卡片到数据库
-      const cardPromises = units.map(async (unit, index) => {
+      const cardPromises = units.map(async (unit) => {
         const cardId = nanoid();
-
-        // 内测阶段暂时跳过积分消耗
-        // if (unit.status === 'completed') {
-        //   await consumeCredits({
-        //     userId: currentUser.id,
-        //     amount: CREDITS_FOR_IMAGE,
-        //     description: `NoteDraw: Image generation (${index + 1})`,
-        //   });
-        // }
 
         await db.insert(noteCard).values({
           id: cardId,
@@ -228,6 +213,27 @@ export const generateNotesAction = userActionClient
           updatedAt: new Date(),
         })
         .where(eq(noteProject.id, projectId));
+
+      // ==================== 成功后扣费 ====================
+      // 计算成功生成的卡片数量
+      const successfulCards = savedCards.filter(c => c.status === 'completed').length;
+
+      if (successfulCards > 0) {
+        // 扣除分析积分（固定1次）
+        await consumeCredits({
+          userId: currentUser.id,
+          amount: creditsForAnalysis,
+          description: 'NoteDraw: 内容分析',
+        });
+
+        // 扣除图片生成积分（按成功数量）
+        await consumeCredits({
+          userId: currentUser.id,
+          amount: creditsForImage * successfulCards,
+          description: `NoteDraw: 图片生成 x${successfulCards}`,
+        });
+      }
+      // ===================================================
 
       return {
         success: true,
@@ -292,11 +298,14 @@ export const regenerateCardAction = userActionClient
 
       const project = projects[0];
 
-      // 内测阶段暂时跳过积分检查
-      // const hasCredits = await hasEnoughCredits({ userId: currentUser.id, requiredCredits: CREDITS_FOR_IMAGE });
-      // if (!hasCredits) {
-      //   return { success: false, error: 'Insufficient credits' };
-      // }
+      // 获取配置的积分消耗数
+      const creditsForImage = await getCreditsForImage();
+
+      // 检查积分
+      const hasCredits = await hasEnoughCredits({ userId: currentUser.id, requiredCredits: creditsForImage });
+      if (!hasCredits) {
+        return { success: false, error: 'Insufficient credits' };
+      }
 
       // 构建 NoteUnit
       const unit: NoteUnit = {
@@ -329,14 +338,14 @@ export const regenerateCardAction = userActionClient
         })
         .where(eq(noteCard.id, cardId));
 
-      // 内测阶段暂时跳过积分消耗
-      // if (updatedUnit.status === 'completed') {
-      //   await consumeCredits({
-      //     userId: currentUser.id,
-      //     amount: CREDITS_FOR_IMAGE,
-      //     description: 'NoteDraw: Image regeneration',
-      //   });
-      // }
+      // 成功后扣费
+      if (updatedUnit.status === 'completed') {
+        await consumeCredits({
+          userId: currentUser.id,
+          amount: creditsForImage,
+          description: 'NoteDraw: 图片重新生成',
+        });
+      }
 
       return {
         success: true,
@@ -389,11 +398,14 @@ export const regenerateWithPromptAction = userActionClient
 
       const project = projects[0];
 
-      // 内测阶段暂时跳过积分检查
-      // const hasCredits = await hasEnoughCredits({ userId: currentUser.id, requiredCredits: CREDITS_FOR_IMAGE });
-      // if (!hasCredits) {
-      //   return { success: false, error: 'Insufficient credits' };
-      // }
+      // 获取配置的积分消耗数
+      const creditsForImage = await getCreditsForImage();
+
+      // 检查积分
+      const hasCredits = await hasEnoughCredits({ userId: currentUser.id, requiredCredits: creditsForImage });
+      if (!hasCredits) {
+        return { success: false, error: 'Insufficient credits' };
+      }
 
       // 直接使用自定义 prompt 调用 paint
       const { paint } = await import('@/ai/notedraw/painter');
@@ -420,14 +432,14 @@ export const regenerateWithPromptAction = userActionClient
         })
         .where(eq(noteCard.id, cardId));
 
-      // 内测阶段暂时跳过积分消耗
-      // if (paintResult.success) {
-      //   await consumeCredits({
-      //     userId: currentUser.id,
-      //     amount: CREDITS_FOR_IMAGE,
-      //     description: 'NoteDraw: Custom prompt regeneration',
-      //   });
-      // }
+      // 成功后扣费
+      if (paintResult.success) {
+        await consumeCredits({
+          userId: currentUser.id,
+          amount: creditsForImage,
+          description: 'NoteDraw: 自定义提示词生成',
+        });
+      }
 
       return {
         success: true,
@@ -506,6 +518,7 @@ export const getProjectAction = userActionClient
 
 /**
  * 获取用户的所有项目
+ * 优化：使用批量查询替代 N+1 查询
  */
 export const getUserProjectsAction = userActionClient
   .action(async ({ ctx }) => {
@@ -521,32 +534,44 @@ export const getUserProjectsAction = userActionClient
         .where(eq(noteProject.userId, currentUser.id))
         .orderBy(desc(noteProject.createdAt));
 
-      // 获取每个项目的卡片
-      const projectsWithCards = await Promise.all(
-        projects.map(async (project) => {
-          const cards = await db
-            .select({
-              id: noteCard.id,
-              imageUrl: noteCard.imageUrl,
-              prompt: noteCard.prompt,
-              originalText: noteCard.originalText,
-              status: noteCard.status,
-              order: noteCard.order,
-              errorMessage: noteCard.errorMessage,
-            })
-            .from(noteCard)
-            .where(eq(noteCard.projectId, project.id))
-            .orderBy(noteCard.order);
+      if (projects.length === 0) {
+        return { success: true, projects: [] };
+      }
 
-          return {
-            ...project,
-            cards,
-            _count: {
-              cards: cards.length,
-            },
-          };
+      // 批量获取所有项目的卡片（优化：单次查询替代 N 次查询）
+      const projectIds = projects.map(p => p.id);
+      const allCards = await db
+        .select({
+          id: noteCard.id,
+          projectId: noteCard.projectId,
+          imageUrl: noteCard.imageUrl,
+          prompt: noteCard.prompt,
+          originalText: noteCard.originalText,
+          status: noteCard.status,
+          order: noteCard.order,
+          errorMessage: noteCard.errorMessage,
         })
-      );
+        .from(noteCard)
+        .where(inArray(noteCard.projectId, projectIds))
+        .orderBy(noteCard.order);
+
+      // 在内存中按项目分组
+      const cardsByProject = new Map<string, typeof allCards>();
+      for (const card of allCards) {
+        const existing = cardsByProject.get(card.projectId) || [];
+        existing.push(card);
+        cardsByProject.set(card.projectId, existing);
+      }
+
+      // 组装结果
+      const projectsWithCards = projects.map(project => {
+        const cards = cardsByProject.get(project.id) || [];
+        return {
+          ...project,
+          cards,
+          _count: { cards: cards.length },
+        };
+      });
 
       return {
         success: true,

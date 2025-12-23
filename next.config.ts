@@ -12,6 +12,20 @@ const nextConfig: NextConfig = {
   /* config options here */
   devIndicators: false,
 
+  // Optimize development performance
+  reactStrictMode: false, // Disable double rendering in dev
+
+  // Experimental optimizations
+  experimental: {
+    // Optimize package imports to reduce bundle size
+    optimizePackageImports: [
+      'lucide-react',
+      '@radix-ui/react-icons',
+      'date-fns',
+      'lodash',
+    ],
+  },
+
   // https://nextjs.org/docs/architecture/nextjs-compiler#remove-console
   // Remove all console.* calls in production only
   compiler: {

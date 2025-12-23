@@ -10,6 +10,80 @@
       "description": "Discover beautiful visual notes created by our community"
     }
   },
+  "Plaza": {
+    "meta": {
+      "title": "Note Plaza - NoteDraw",
+      "description": "Discover beautiful visual notes created by our community"
+    },
+    "title": "Note Plaza",
+    "subtitle": "Discover beautiful visual notes created by our community",
+    "filters": {
+      "all": "All",
+      "featured": "Featured",
+      "latest": "Latest",
+      "popular": "Popular"
+    },
+    "styles": {
+      "all": "All Styles",
+      "sketch": "Sketch",
+      "business": "Business",
+      "cute": "Cute",
+      "minimal": "Minimal",
+      "chalkboard": "Chalkboard"
+    },
+    "tags": {
+      "title": "Popular Tags",
+      "all": "All"
+    },
+    "note": {
+      "views": "{count} views",
+      "likes": "{count} likes",
+      "featured": "Featured"
+    },
+    "empty": {
+      "title": "No Notes Yet",
+      "description": "No one has shared notes yet. Be the first to share!"
+    },
+    "detail": {
+      "back": "Back to Plaza",
+      "views": "Views",
+      "likes": "Likes",
+      "tags": "Tags",
+      "publishedAt": "Published on",
+      "cards": "Note Cards",
+      "download": "Download",
+      "share": "Share",
+      "shareSuccess": "Link copied to clipboard",
+      "notFound": {
+        "title": "Note Not Found",
+        "description": "This note may have been deleted or set to private"
+      }
+    },
+    "share": {
+      "title": "Share to Plaza",
+      "description": "Share your note to the plaza for others to see",
+      "noteTitle": "Note Title",
+      "noteTitlePlaceholder": "Give your note a title",
+      "noteDescription": "Description",
+      "noteDescriptionPlaceholder": "Briefly describe this note (optional)",
+      "tags": "Tags",
+      "tagsPlaceholder": "Separate multiple tags with commas (optional)",
+      "agreement": "I agree to publicly display this note",
+      "submit": "Share to Plaza",
+      "submitting": "Sharing...",
+      "success": "Note shared to plaza",
+      "error": "Failed to share, please try again",
+      "cancel": "Cancel"
+    },
+    "remove": {
+      "title": "Remove from Plaza",
+      "description": "Are you sure you want to remove this note from the plaza?",
+      "confirm": "Confirm Remove",
+      "cancel": "Cancel",
+      "success": "Note removed from plaza",
+      "error": "Failed to remove, please try again"
+    }
+  },
   "Common": {
     "premium": "Premium",
     "login": "Log in",
@@ -321,6 +395,12 @@
   },
   "Marketing": {
     "navbar": {
+      "createNote": {
+        "title": "Create Note"
+      },
+      "plaza": {
+        "title": "Note Plaza"
+      },
       "features": {
         "title": "Features"
       },
@@ -601,12 +681,17 @@
     },
     "admin": {
       "title": "Admin",
+      "console": "Admin Console",
       "dashboard": {
         "title": "Dashboard",
         "description": "Overview of your application"
       },
       "redemption": {
-        "title": "Redemption Codes"
+        "title": "Redemption Codes",
+        "description": "Manage redemption codes for credit packages"
+      },
+      "credits": {
+        "title": "Credits"
       },
       "content": {
         "title": "Content Moderation",
@@ -616,8 +701,17 @@
         "title": "Blog Management",
         "description": "Manage your blog posts and AI-generated content"
       },
+      "settings": {
+        "title": "System Settings",
+        "description": "Manage system configuration and feature toggles"
+      },
+      "plaza": {
+        "title": "Plaza Management",
+        "description": "Manage publicly shared notes in the plaza"
+      },
       "users": {
         "title": "Users",
+        "description": "Manage user accounts and permissions",
         "fakeData": "Note: Faked data for demonstration, some features are disabled",
         "error": "Failed to get users",
         "search": "Search users...",

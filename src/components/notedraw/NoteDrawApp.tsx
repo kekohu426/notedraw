@@ -107,8 +107,25 @@ export function NoteDrawApp({ locale = 'en', initialCredits = 0 }: NoteDrawAppPr
         aiConfig,
       });
 
+      // Check for server errors (e.g., unauthorized)
+      if (createResult?.serverError) {
+        const errMsg = typeof createResult.serverError === 'string'
+          ? createResult.serverError
+          : JSON.stringify(createResult.serverError);
+        throw new Error(errMsg);
+      }
+
+      // Check for validation errors
+      if (createResult?.validationErrors) {
+        const firstError = Object.values(createResult.validationErrors).flat()[0];
+        throw new Error(typeof firstError === 'string' ? firstError : 'Validation failed');
+      }
+
       if (!createResult?.data?.success || !createResult.data.projectId) {
-        throw new Error(createResult?.data?.error || 'Failed to create project');
+        const errMsg = typeof createResult?.data?.error === 'string'
+          ? createResult.data.error
+          : 'Failed to create project';
+        throw new Error(errMsg);
       }
 
       const newProjectId = createResult.data.projectId;
@@ -121,8 +138,18 @@ export function NoteDrawApp({ locale = 'en', initialCredits = 0 }: NoteDrawAppPr
         aiConfig,
       });
 
+      if (generateResult?.serverError) {
+        const errMsg = typeof generateResult.serverError === 'string'
+          ? generateResult.serverError
+          : JSON.stringify(generateResult.serverError);
+        throw new Error(errMsg);
+      }
+
       if (!generateResult?.data?.success) {
-        throw new Error(generateResult?.data?.error || 'Analysis failed');
+        const errMsg = typeof generateResult?.data?.error === 'string'
+          ? generateResult.data.error
+          : 'Analysis failed';
+        throw new Error(errMsg);
       }
 
       // 直接显示结果
@@ -172,23 +199,25 @@ export function NoteDrawApp({ locale = 'en', initialCredits = 0 }: NoteDrawAppPr
         aiConfig,
       });
 
-      console.log('🔍 createResult:', createResult);
-      console.log('🔍 createResult.data:', createResult?.data);
-      console.log('🔍 createResult.validationErrors:', createResult?.validationErrors);
-      if (createResult?.validationErrors?.inputText) {
-        console.error('🔴 inputText validation error:', createResult.validationErrors.inputText);
+      // Check for server errors (e.g., unauthorized)
+      if (createResult?.serverError) {
+        const errMsg = typeof createResult.serverError === 'string'
+          ? createResult.serverError
+          : JSON.stringify(createResult.serverError);
+        throw new Error(errMsg);
       }
-      console.log('🔍 createResult.serverError:', createResult?.serverError);
-      console.log('🔍 inputText being sent:', { text: inputText, length: inputText.length, trimmed: inputText.trim().length });
+
+      // Check for validation errors
+      if (createResult?.validationErrors) {
+        const firstError = Object.values(createResult.validationErrors).flat()[0];
+        throw new Error(typeof firstError === 'string' ? firstError : 'Validation failed');
+      }
 
       if (!createResult?.data?.success || !createResult.data.projectId) {
-        console.error('🔴 Create failed:', {
-          hasData: !!createResult?.data,
-          success: createResult?.data?.success,
-          projectId: createResult?.data?.projectId,
-          error: createResult?.data?.error,
-        });
-        throw new Error(createResult?.data?.error || 'Failed to create project');
+        const errMsg = typeof createResult?.data?.error === 'string'
+          ? createResult.data.error
+          : 'Failed to create project';
+        throw new Error(errMsg);
       }
 
       const newProjectId = createResult.data.projectId;
@@ -203,8 +232,18 @@ export function NoteDrawApp({ locale = 'en', initialCredits = 0 }: NoteDrawAppPr
         aiConfig,
       });
 
+      if (generateResult?.serverError) {
+        const errMsg = typeof generateResult.serverError === 'string'
+          ? generateResult.serverError
+          : JSON.stringify(generateResult.serverError);
+        throw new Error(errMsg);
+      }
+
       if (!generateResult?.data?.success) {
-        throw new Error(generateResult?.data?.error || 'Generation failed');
+        const errMsg = typeof generateResult?.data?.error === 'string'
+          ? generateResult.data.error
+          : 'Generation failed';
+        throw new Error(errMsg);
       }
 
       setStage('done');
@@ -378,6 +417,13 @@ export function NoteDrawApp({ locale = 'en', initialCredits = 0 }: NoteDrawAppPr
                   : 'Transform text into beautiful hand-drawn visual notes'}
               </p>
             </div>
+
+            {/* 最近生成记录 - 仅在空闲状态显示 */}
+            {stage === 'idle' && (
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <RecentSketches locale={locale} maxItems={4} />
+              </div>
+            )}
 
             {/* Tab 切换 */}
             <div className="flex rounded-lg border bg-muted/50 p-1">

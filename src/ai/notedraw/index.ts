@@ -23,6 +23,7 @@ export { paint, paintBatch, base64ToDataUrl } from './painter';
 import { organize } from './organizer';
 import { designPrompt } from './designer';
 import { paint, base64ToDataUrl } from './painter';
+import { nanoid } from 'nanoid';
 import type {
   GenerateRequest,
   NoteUnit,
@@ -134,7 +135,7 @@ export async function generate(
     for (let i = 0; i < organizeResult.structures.length; i++) {
       const structure = organizeResult.structures[i];
       units.push({
-        id: `unit-${Date.now()}-${i}`,
+        id: `unit-${nanoid()}`,
         order: i,
         originalText: inputText, // 使用完整文本作为原文
         structure,
@@ -145,37 +146,39 @@ export async function generate(
     // Step 2 & 3: Designer + Painter - 为每个单元生成图像
     callback?.onStageChange?.('designing', 'Designing visual layouts...');
 
+    // 先生成所有 Prompt（快速，可以串行）
     for (let i = 0; i < units.length; i++) {
       const unit = units[i];
-      callback?.onUnitStart?.(i, units.length);
+      const { prompt, negativePrompt } = designPrompt(
+        unit.structure!,
+        visualStyle,
+        language,
+        mode,
+        signature
+      );
+      unit.prompt = prompt;
+      (unit as { negativePrompt?: string }).negativePrompt = negativePrompt;
+      console.log(`[Generate] Card ${i + 1} prompt generated (${prompt.length} chars)`);
+    }
+
+    // 并行生成图像（优化：限制并发数为2，避免API限流）
+    callback?.onStageChange?.('painting', `Creating ${units.length} visual notes...`);
+    const CONCURRENCY_LIMIT = 2;
+    let completedCount = 0;
+
+    const processUnit = async (unit: NoteUnit, index: number) => {
+      callback?.onUnitStart?.(index, units.length);
+      unit.status = 'generating';
 
       try {
-        // Designer: 生成 Prompt
-        unit.status = 'generating';
-        const { prompt, negativePrompt } = designPrompt(
-          unit.structure!,
-          visualStyle,
-          language,
-          mode,
-          signature
-        );
-        unit.prompt = prompt;
-
-        console.log(`[Generate] Card ${i + 1} prompt generated (${prompt.length} chars)`);
-
-        // Painter: 生成图像
-        callback?.onStageChange?.('painting', `Creating visual note ${i + 1} of ${units.length}...`);
-
         if (USE_PLACEHOLDER_IMAGE) {
-          // 开发模式：使用占位图
-          console.log('[Generate] Using placeholder image (dev mode)');
-          unit.imageUrl = generatePlaceholderImage(prompt, unit.structure?.title || 'Visual Note');
+          console.log(`[Generate] Card ${index + 1}: Using placeholder image (dev mode)`);
+          unit.imageUrl = generatePlaceholderImage(unit.prompt!, unit.structure?.title || 'Visual Note');
           unit.status = 'completed';
         } else {
-          // 生产模式：调用真实API
           const paintResult = await paint({
-            prompt,
-            negativePrompt,
+            prompt: unit.prompt!,
+            negativePrompt: (unit as { negativePrompt?: string }).negativePrompt,
             imageModel,
             apiProvider,
             customProvider,
@@ -199,7 +202,24 @@ export async function generate(
         callback?.onError?.(unit.errorMessage);
       }
 
-      callback?.onUnitComplete?.(i, unit);
+      completedCount++;
+      callback?.onUnitComplete?.(index, unit);
+      callback?.onStageChange?.('painting', `Creating visual notes (${completedCount}/${units.length})...`);
+    };
+
+    // 使用并发控制的并行处理
+    const chunks: NoteUnit[][] = [];
+    for (let i = 0; i < units.length; i += CONCURRENCY_LIMIT) {
+      chunks.push(units.slice(i, i + CONCURRENCY_LIMIT));
+    }
+
+    for (const chunk of chunks) {
+      await Promise.all(
+        chunk.map((unit, chunkIndex) => {
+          const globalIndex = units.indexOf(unit);
+          return processUnit(unit, globalIndex);
+        })
+      );
     }
 
     callback?.onStageChange?.('done', 'All visual notes generated!');

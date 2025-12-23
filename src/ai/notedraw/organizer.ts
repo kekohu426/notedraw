@@ -275,6 +275,49 @@ export async function organize(
 
   console.log(`[Organizer] Starting analysis, mode: ${mode}, text length: ${text.length}`);
 
+  // 开发占位模式：跳过真实API调用，返回模拟数据
+  if (process.env.DEV_PLACEHOLDER_MODE === 'true') {
+    console.log('[Organizer] DEV_PLACEHOLDER_MODE: returning mock analysis data');
+
+    // 根据文本长度决定生成几张卡片
+    const cardCount = text.length > 500 ? 2 : 1;
+    const mockStructures: LeftBrainData[] = [];
+
+    for (let i = 0; i < cardCount; i++) {
+      mockStructures.push({
+        title: language === 'zh'
+          ? `开发模式卡片 ${i + 1}/${cardCount}`
+          : `Dev Mode Card ${i + 1}/${cardCount}`,
+        summary_context: language === 'zh'
+          ? `这是开发占位模式生成的模拟数据。原文长度: ${text.length}字符`
+          : `This is mock data from dev placeholder mode. Input length: ${text.length} chars`,
+        visual_theme_keywords: 'development, placeholder, mock, test',
+        modules: [
+          {
+            id: '1',
+            heading: language === 'zh' ? '模拟知识点 1' : 'Mock Point 1',
+            content: text.substring(0, Math.min(100, text.length)) + (text.length > 100 ? '...' : ''),
+            keywords: ['mock', 'dev', 'test'],
+          },
+          {
+            id: '2',
+            heading: language === 'zh' ? '模拟知识点 2' : 'Mock Point 2',
+            content: language === 'zh'
+              ? '开发模式下不调用真实AI API'
+              : 'Real AI API is not called in dev mode',
+            keywords: ['placeholder', 'development'],
+          },
+        ],
+      });
+    }
+
+    return {
+      totalKnowledgePoints: cardCount * 2,
+      structures: mockStructures,
+      rawAnalysis: { devMode: true, inputLength: text.length },
+    };
+  }
+
   try {
     // 调用GLM分析
     const response = await callGLM(getAnalyzePrompt(text, language, mode));
@@ -324,28 +367,3 @@ export async function organize(
   }
 }
 
-// 导出旧函数以保持兼容（标记为deprecated）
-/** @deprecated Use organize() instead */
-export async function shouldSplitText(text: string, language: Language) {
-  console.warn('[Organizer] shouldSplitText is deprecated, use organize() instead');
-  return { shouldSplit: false };
-}
-
-/** @deprecated Use organize() instead */
-export function splitTextByPoints(text: string, splitPoints: string[]) {
-  console.warn('[Organizer] splitTextByPoints is deprecated');
-  return [text];
-}
-
-/** @deprecated Use organize() instead */
-export function splitTextByLength(text: string, maxLength = 800) {
-  console.warn('[Organizer] splitTextByLength is deprecated');
-  return [text];
-}
-
-/** @deprecated Use organize() instead */
-export async function extractStructure(text: string, language: Language) {
-  console.warn('[Organizer] extractStructure is deprecated, use organize() instead');
-  const result = await organize(text, language, { mode: 'compact' });
-  return result.structures[0];
-}

@@ -32,9 +32,24 @@ import {
   RefreshCw,
   Check,
   Languages,
+  Pencil,
+  Trash2,
+  Save,
+  AlertTriangle,
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { generateBlogAction, listBlogsAction } from '@/actions/blog';
+import { generateBlogAction, listBlogsAction, getBlogAction, updateBlogAction, deleteBlogAction } from '@/actions/blog';
 
 // 分类选项
 const CATEGORIES = [
@@ -60,6 +75,14 @@ const LANGUAGES = [
 interface BlogItem {
   slug: string;
   hasZh: boolean;
+  title?: string;
+}
+
+interface EditingBlog {
+  slug: string;
+  language: 'en' | 'zh';
+  title: string;
+  rawContent: string;
 }
 
 export function BlogManagementClient() {
@@ -72,6 +95,18 @@ export function BlogManagementClient() {
   // 生成状态
   const [isGenerating, setIsGenerating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // 编辑状态
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingBlog, setEditingBlog] = useState<EditingBlog | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [isLoadingBlog, setIsLoadingBlog] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 删除状态
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingSlug, setDeletingSlug] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // 表单状态
   const [topic, setTopic] = useState('');
@@ -148,6 +183,95 @@ export function BlogManagementClient() {
       toast.error('生成博客时出错');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // 打开编辑对话框
+  const handleEdit = async (slug: string, language: 'en' | 'zh' = 'en') => {
+    setIsLoadingBlog(true);
+    setEditDialogOpen(true);
+
+    try {
+      const result = await getBlogAction({ slug, language });
+      if (result?.data?.success) {
+        setEditingBlog({
+          slug,
+          language,
+          title: result.data.title || '',
+          rawContent: result.data.rawContent || '',
+        });
+        setEditContent(result.data.rawContent || '');
+      } else {
+        toast.error(result?.data?.error || '加载文章失败');
+        setEditDialogOpen(false);
+      }
+    } catch (error) {
+      console.error('Load blog error:', error);
+      toast.error('加载文章时出错');
+      setEditDialogOpen(false);
+    } finally {
+      setIsLoadingBlog(false);
+    }
+  };
+
+  // 保存编辑
+  const handleSave = async () => {
+    if (!editingBlog) return;
+
+    setIsSaving(true);
+    try {
+      const result = await updateBlogAction({
+        slug: editingBlog.slug,
+        language: editingBlog.language,
+        content: editContent,
+      });
+
+      if (result?.data?.success) {
+        toast.success('保存成功');
+        setEditDialogOpen(false);
+        setEditingBlog(null);
+        setEditContent('');
+      } else {
+        toast.error(result?.data?.error || '保存失败');
+      }
+    } catch (error) {
+      console.error('Save blog error:', error);
+      toast.error('保存时出错');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // 打开删除确认
+  const handleDeleteConfirm = (slug: string) => {
+    setDeletingSlug(slug);
+    setDeleteDialogOpen(true);
+  };
+
+  // 执行删除
+  const handleDelete = async () => {
+    if (!deletingSlug) return;
+
+    setIsDeleting(true);
+    try {
+      const result = await deleteBlogAction({
+        slug: deletingSlug,
+        deleteAll: true,
+      });
+
+      if (result?.data?.success) {
+        toast.success(result.data.message);
+        setDeleteDialogOpen(false);
+        setDeletingSlug(null);
+        loadBlogs();
+      } else {
+        toast.error(result?.data?.error || '删除失败');
+      }
+    } catch (error) {
+      console.error('Delete blog error:', error);
+      toast.error('删除时出错');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -347,8 +471,29 @@ export function BlogManagementClient() {
                       </Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" asChild>
+                  <div className="flex items-center gap-1">
+                    {/* 编辑英文版 */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEdit(blog.slug, 'en')}
+                      title="编辑英文版"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    {/* 编辑中文版（如果存在） */}
+                    {blog.hasZh && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(blog.slug, 'zh')}
+                        title="编辑中文版"
+                      >
+                        <Languages className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {/* 预览 */}
+                    <Button variant="ghost" size="sm" asChild title="预览">
                       <a
                         href={`/blog/${blog.slug}`}
                         target="_blank"
@@ -356,6 +501,16 @@ export function BlogManagementClient() {
                       >
                         <ExternalLink className="h-4 w-4" />
                       </a>
+                    </Button>
+                    {/* 删除 */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteConfirm(blog.slug)}
+                      className="text-destructive hover:text-destructive"
+                      title="删除"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -414,6 +569,108 @@ export function BlogManagementClient() {
           </p>
         </CardContent>
       </Card>
+
+      {/* 编辑对话框 */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              编辑文章
+              {editingBlog && (
+                <Badge variant="outline" className="ml-2">
+                  {editingBlog.language === 'zh' ? '中文版' : '英文版'}
+                </Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {editingBlog?.slug && `正在编辑: ${editingBlog.slug}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoadingBlog ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>文章内容 (MDX 格式)</Label>
+                <Textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="min-h-[400px] font-mono text-sm"
+                  placeholder="文章内容..."
+                />
+                <p className="text-xs text-muted-foreground">
+                  包含 frontmatter (---) 和正文内容，支持 Markdown 格式
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditDialogOpen(false);
+                setEditingBlog(null);
+                setEditContent('');
+              }}
+              disabled={isSaving}
+            >
+              取消
+            </Button>
+            <Button onClick={handleSave} disabled={isSaving || isLoadingBlog}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  保存中...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  保存
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除确认对话框 */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              确认删除
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除文章 <strong>{deletingSlug}</strong> 吗？
+              <br />
+              这将同时删除该文章的所有语言版本（中文和英文），此操作不可恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  删除中...
+                </>
+              ) : (
+                '确认删除'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

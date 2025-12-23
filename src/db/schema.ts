@@ -145,9 +145,13 @@ export const noteProject = pgTable("note_project", {
 	errorMessage: text("error_message"),
 	// 广场相关字段
 	isPublic: boolean("is_public").notNull().default(false), // 是否公开到广场
+	isFeatured: boolean("is_featured").notNull().default(false), // 是否精选
+	slug: text("slug").unique(), // URL slug
+	description: text("description"), // 简短描述
 	tags: text("tags"), // 标签，逗号分隔
 	likes: integer("likes").notNull().default(0), // 点赞数
 	views: integer("views").notNull().default(0), // 浏览数
+	publishedAt: timestamp("published_at"), // 发布时间
 	createdAt: timestamp("created_at").notNull().defaultNow(),
 	updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
@@ -219,4 +223,23 @@ export const redemptionRecord = pgTable("redemption_record", {
 }, (table) => ({
 	redemptionRecordCodeIdIdx: index("redemption_record_code_id_idx").on(table.codeId),
 	redemptionRecordUserIdIdx: index("redemption_record_user_id_idx").on(table.userId),
+}));
+
+// ============================================================
+// 系统配置表
+// ============================================================
+
+/**
+ * 系统配置表 - 存储动态配置项
+ */
+export const systemConfig = pgTable("system_config", {
+	id: text("id").primaryKey(),
+	category: text("category").notNull(), // 配置分类: 'credits' | 'features' | 'limits'
+	key: text("key").notNull(), // 配置键
+	value: text("value").notNull(), // 配置值
+	description: text("description"), // 配置描述
+	createdAt: timestamp("created_at").notNull().defaultNow(),
+	updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+	systemConfigCategoryKeyIdx: index("system_config_category_key_idx").on(table.category, table.key),
 }));

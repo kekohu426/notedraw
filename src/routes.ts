@@ -33,11 +33,18 @@ export enum Routes {
   NoteDraw = '/notedraw',
   NoteDrawHistory = '/notedraw/history',
 
+  // plaza routes (public)
+  Plaza = '/plaza',
+  PlazaNote = '/plaza/notes', // /plaza/notes/[slug]
+
   // admin routes
   AdminDashboard = '/admin/dashboard',
   AdminUsers = '/admin/users',
   AdminOrders = '/admin/orders',
   AdminRedemption = '/admin/redemption',
+  AdminCredits = '/admin/credits',
+  AdminPlaza = '/admin/plaza',
+  AdminSettings = '/admin/settings',
   AdminContent = '/admin/content',
   AdminBlog = '/admin/blog',
   SettingsProfile = '/settings/profile',
@@ -93,6 +100,9 @@ export const protectedRoutes = [
   Routes.AdminUsers,
   Routes.AdminOrders,
   Routes.AdminRedemption,
+  Routes.AdminCredits,
+  Routes.AdminPlaza,
+  Routes.AdminSettings,
   Routes.AdminContent,
   Routes.AdminBlog,
   Routes.SettingsProfile,
