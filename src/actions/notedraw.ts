@@ -2,13 +2,13 @@
 
 import { getDb } from '@/db';
 import { noteProject, noteCard } from '@/db/schema';
-import { userActionClient } from '@/lib/safe-action';
+import { userActionClient, adminActionClient } from '@/lib/safe-action';
 import type { User } from '@/lib/auth-types';
 import { consumeCredits, hasEnoughCredits } from '@/credits/credits';
 import { getCreditsForAnalysis, getCreditsForImage } from '@/lib/config-reader';
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
-import { eq, desc, inArray } from 'drizzle-orm';
+import { eq, desc, inArray, sql, like, and, or } from 'drizzle-orm';
 import {
   generate,
   regenerateUnit,
@@ -732,6 +732,127 @@ export const fetchUrlContentAction = userActionClient
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch URL content',
+      };
+    }
+  });
+
+// ============================================================
+// 管理员功能
+// ============================================================
+
+const getAdminNotesSchema = z.object({
+  page: z.number().min(1).default(1),
+  limit: z.number().min(1).max(50).default(20),
+  status: z.enum(['all', 'processing', 'completed', 'failed']).default('all'),
+  search: z.string().optional(),
+});
+
+/**
+ * 获取所有用户的笔记（管理员）
+ */
+export const getAdminNotesAction = adminActionClient
+  .schema(getAdminNotesSchema)
+  .action(async ({ parsedInput }) => {
+    const { page, limit, status, search } = parsedInput;
+
+    try {
+      const db = await getDb();
+      const { user } = await import('@/db/schema');
+
+      // 构建查询条件
+      const conditions = [];
+      if (status !== 'all') {
+        conditions.push(eq(noteProject.status, status));
+      }
+      if (search) {
+        conditions.push(
+          or(
+            like(noteProject.title, `%${search}%`),
+            like(noteProject.inputText, `%${search}%`)
+          )
+        );
+      }
+
+      // 获取笔记列表
+      const notes = await db
+        .select({
+          id: noteProject.id,
+          userId: noteProject.userId,
+          title: noteProject.title,
+          inputText: noteProject.inputText,
+          language: noteProject.language,
+          visualStyle: noteProject.visualStyle,
+          generateMode: noteProject.generateMode,
+          status: noteProject.status,
+          errorMessage: noteProject.errorMessage,
+          createdAt: noteProject.createdAt,
+          updatedAt: noteProject.updatedAt,
+          userName: user.name,
+          userEmail: user.email,
+        })
+        .from(noteProject)
+        .leftJoin(user, eq(noteProject.userId, user.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(noteProject.createdAt))
+        .limit(limit)
+        .offset((page - 1) * limit);
+
+      // 获取总数
+      const countQuery = db
+        .select({ count: sql<number>`count(*)` })
+        .from(noteProject);
+      if (conditions.length > 0) {
+        countQuery.where(and(...conditions));
+      }
+      const countResult = await countQuery;
+      const total = Number(countResult[0]?.count || 0);
+
+      return {
+        success: true,
+        notes,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      console.error('Get admin notes error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get notes',
+      };
+    }
+  });
+
+const adminDeleteNoteSchema = z.object({
+  projectId: z.string(),
+});
+
+/**
+ * 删除笔记（管理员）
+ */
+export const adminDeleteNoteAction = adminActionClient
+  .schema(adminDeleteNoteSchema)
+  .action(async ({ parsedInput }) => {
+    const { projectId } = parsedInput;
+
+    try {
+      const db = await getDb();
+
+      // 删除关联的卡片
+      await db.delete(noteCard).where(eq(noteCard.projectId, projectId));
+
+      // 删除项目
+      await db.delete(noteProject).where(eq(noteProject.id, projectId));
+
+      return { success: true };
+    } catch (error) {
+      console.error('Admin delete note error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete note',
       };
     }
   });

@@ -709,6 +709,10 @@
         "title": "Plaza Management",
         "description": "Manage publicly shared notes in the plaza"
       },
+      "notes": {
+        "title": "Notes Management",
+        "description": "Manage all users' note projects"
+      },
       "users": {
         "title": "Users",
         "description": "Manage user accounts and permissions",
@@ -923,7 +927,8 @@
             "USAGE": "Consumed Credits",
             "EXPIRE": "Expired Credits",
             "SUBSCRIPTION_RENEWAL": "Subscription Renewal",
-            "LIFETIME_MONTHLY": "Lifetime Monthly"
+            "LIFETIME_MONTHLY": "Lifetime Monthly",
+            "REDEMPTION": "Redemption Code"
           },
           "detailViewer": {
             "title": "Credit Transaction Detail",

@@ -43,6 +43,7 @@ import {
   GiftIcon,
   HandCoinsIcon,
   ShoppingCartIcon,
+  TicketIcon,
   XIcon,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -152,6 +153,8 @@ export function CreditTransactionsTable({
         return <BanknoteIcon className="h-5 w-5" />;
       case CREDIT_TRANSACTION_TYPE.LIFETIME_MONTHLY:
         return <GemIcon className="h-5 w-5" />;
+      case CREDIT_TRANSACTION_TYPE.REDEMPTION:
+        return <TicketIcon className="h-5 w-5" />;
       default:
         return null;
     }
@@ -174,6 +177,8 @@ export function CreditTransactionsTable({
         return t('types.SUBSCRIPTION_RENEWAL');
       case CREDIT_TRANSACTION_TYPE.LIFETIME_MONTHLY:
         return t('types.LIFETIME_MONTHLY');
+      case CREDIT_TRANSACTION_TYPE.REDEMPTION:
+        return t('types.REDEMPTION');
       default:
         return type;
     }
@@ -202,6 +207,10 @@ export function CreditTransactionsTable({
       {
         label: t('types.LIFETIME_MONTHLY'),
         value: CREDIT_TRANSACTION_TYPE.LIFETIME_MONTHLY,
+      },
+      {
+        label: t('types.REDEMPTION'),
+        value: CREDIT_TRANSACTION_TYPE.REDEMPTION,
       },
     ],
     [t]

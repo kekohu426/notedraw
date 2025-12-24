@@ -34,6 +34,7 @@ import {
     CoinsIcon,
     SettingsIcon,
     GlobeIcon,
+    BookOpenIcon,
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
@@ -78,6 +79,12 @@ function useAdminSidebarLinks(): NestedMenuItem[] {
             title: t('admin.plaza.title'),
             icon: <GlobeIcon className="size-4 shrink-0" />,
             href: Routes.AdminPlaza,
+            external: false,
+        },
+        {
+            title: t('admin.notes.title'),
+            icon: <BookOpenIcon className="size-4 shrink-0" />,
+            href: Routes.AdminNotes,
             external: false,
         },
         {

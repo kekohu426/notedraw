@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -17,12 +16,14 @@ import {
   Palette,
   Languages,
   FileText,
+  Share2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getProjectAction, regenerateCardAction } from '@/actions/notedraw';
+import { shareToPlazaAction } from '@/actions/plaza';
 import { LocaleLink } from '@/i18n/navigation';
 
 interface NoteCard {
@@ -56,10 +57,10 @@ interface ProjectDetailProps {
 }
 
 export function ProjectDetail({ projectId, locale }: ProjectDetailProps) {
-  const router = useRouter();
   const [project, setProject] = useState<NoteProject | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [regeneratingCardId, setRegeneratingCardId] = useState<string | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
 
   const t = {
     en: {
@@ -99,6 +100,11 @@ export function ProjectDetail({ projectId, locale }: ProjectDetailProps) {
       },
       originalText: 'Original Text',
       prompt: 'Prompt',
+      shareToPlaza: 'Share to Plaza',
+      sharing: 'Sharing...',
+      shareSuccess: 'Successfully shared to plaza!',
+      shareFail: 'Failed to share to plaza',
+      shareRequireCompleted: 'Only completed projects can be shared',
     },
     zh: {
       loading: '加载项目中...',
@@ -137,6 +143,11 @@ export function ProjectDetail({ projectId, locale }: ProjectDetailProps) {
       },
       originalText: '原文内容',
       prompt: '生成提示词',
+      shareToPlaza: '分享到广场',
+      sharing: '分享中...',
+      shareSuccess: '成功分享到广场！',
+      shareFail: '分享失败',
+      shareRequireCompleted: '只有已完成的项目才能分享',
     },
   };
 
@@ -213,6 +224,41 @@ export function ProjectDetail({ projectId, locale }: ProjectDetailProps) {
     }
   };
 
+  const handleShareToPlaza = async () => {
+    if (!project) return;
+
+    if (project.status !== 'completed') {
+      toast.error(texts.shareRequireCompleted);
+      return;
+    }
+
+    setIsSharing(true);
+    try {
+      // 自动从项目信息生成分享内容
+      const title = project.title || project.inputText.slice(0, 50);
+      const description = project.inputText.slice(0, 200);
+      const tags = project.visualStyle; // 使用视觉风格作为标签
+
+      const result = await shareToPlazaAction({
+        projectId: project.id,
+        title,
+        description,
+        tags,
+      });
+
+      if (result?.data?.success) {
+        toast.success(texts.shareSuccess);
+      } else {
+        throw new Error(result?.data?.error || 'Share failed');
+      }
+    } catch (error) {
+      console.error('Share error:', error);
+      toast.error(texts.shareFail);
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
@@ -273,24 +319,47 @@ export function ProjectDetail({ projectId, locale }: ProjectDetailProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <Button variant="ghost" size="sm" asChild className="shrink-0">
             <LocaleLink href="/notedraw/history">
               <ArrowLeft className="mr-2 h-4 w-4" />
               {texts.backToHistory}
             </LocaleLink>
           </Button>
-          <h1 className="text-2xl font-bold">
-            {project.title || project.inputText.slice(0, 30) + '...'}
+          <h1
+            className="text-lg sm:text-xl font-bold truncate max-w-[300px] sm:max-w-[400px]"
+            title={project.title || project.inputText}
+          >
+            {project.title || (project.inputText.length > 25 ? project.inputText.slice(0, 25) + '...' : project.inputText)}
           </h1>
         </div>
-        <Badge variant={getStatusVariant(project.status)}>
-          {getStatusIcon(project.status)}
-          <span className="ml-1">
-            {texts.statuses[project.status as keyof typeof texts.statuses] || project.status}
-          </span>
-        </Badge>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleShareToPlaza}
+            disabled={project.status !== 'completed' || isSharing}
+          >
+            {isSharing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {texts.sharing}
+              </>
+            ) : (
+              <>
+                <Share2 className="mr-2 h-4 w-4" />
+                {texts.shareToPlaza}
+              </>
+            )}
+          </Button>
+          <Badge variant={getStatusVariant(project.status)}>
+            {getStatusIcon(project.status)}
+            <span className="ml-1">
+              {texts.statuses[project.status as keyof typeof texts.statuses] || project.status}
+            </span>
+          </Badge>
+        </div>
       </div>
 
       {/* Project Info */}
@@ -368,7 +437,7 @@ export function ProjectDetail({ projectId, locale }: ProjectDetailProps) {
                 <CardContent className="space-y-3 p-4">
                   {/* Status */}
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">#{card.order}</span>
+                    <span className="text-sm font-medium">#{card.order + 1}</span>
                     <Badge variant={getStatusVariant(card.status)} className="text-xs">
                       {getStatusIcon(card.status)}
                       <span className="ml-1">

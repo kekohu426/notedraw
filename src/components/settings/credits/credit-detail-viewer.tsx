@@ -20,6 +20,7 @@ import {
   GiftIcon,
   HandCoinsIcon,
   ShoppingCartIcon,
+  TicketIcon,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -65,6 +66,8 @@ export function CreditDetailViewer({ transaction }: CreditDetailViewerProps) {
         return <BanknoteIcon className="h-5 w-5" />;
       case CREDIT_TRANSACTION_TYPE.LIFETIME_MONTHLY:
         return <GemIcon className="h-5 w-5" />;
+      case CREDIT_TRANSACTION_TYPE.REDEMPTION:
+        return <TicketIcon className="h-5 w-5" />;
       default:
         return null;
     }
@@ -87,6 +90,8 @@ export function CreditDetailViewer({ transaction }: CreditDetailViewerProps) {
         return t('types.SUBSCRIPTION_RENEWAL');
       case CREDIT_TRANSACTION_TYPE.LIFETIME_MONTHLY:
         return t('types.LIFETIME_MONTHLY');
+      case CREDIT_TRANSACTION_TYPE.REDEMPTION:
+        return t('types.REDEMPTION');
       default:
         return type;
     }

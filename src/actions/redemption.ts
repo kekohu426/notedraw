@@ -1,12 +1,13 @@
 'use server';
 
 import { getDb } from '@/db';
-import { redemptionCode, redemptionRecord, userCredit } from '@/db/schema';
+import { redemptionCode, redemptionRecord, userCredit, creditTransaction } from '@/db/schema';
 import { userActionClient, adminActionClient } from '@/lib/safe-action';
 import type { User } from '@/lib/auth-types';
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
 import { eq, desc, and, gt, sql } from 'drizzle-orm';
+import { CREDIT_TRANSACTION_TYPE } from '@/credits/types';
 
 // ============================================================
 // Schema 定义
@@ -96,6 +97,8 @@ export const redeemCodeAction = userActionClient
 
       // 根据类型处理
       if (codeRecord.type === 'credits') {
+        const now = new Date();
+
         // 添加积分
         const existingCredit = await db
           .select()
@@ -108,7 +111,7 @@ export const redeemCodeAction = userActionClient
             .update(userCredit)
             .set({
               currentCredits: sql`${userCredit.currentCredits} + ${codeRecord.value}`,
-              updatedAt: new Date(),
+              updatedAt: now,
             })
             .where(eq(userCredit.userId, currentUser.id));
         } else {
@@ -118,6 +121,18 @@ export const redeemCodeAction = userActionClient
             currentCredits: codeRecord.value,
           });
         }
+
+        // 添加积分明细记录
+        await db.insert(creditTransaction).values({
+          id: nanoid(),
+          userId: currentUser.id,
+          type: CREDIT_TRANSACTION_TYPE.REDEMPTION,
+          amount: codeRecord.value,
+          remainingAmount: codeRecord.value,
+          description: `兑换码兑换: ${codeRecord.code}`,
+          createdAt: now,
+          updatedAt: now,
+        });
       }
       // TODO: 处理 membership 和 trial 类型
 

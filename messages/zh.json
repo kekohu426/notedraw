@@ -708,6 +708,10 @@
         "title": "广场管理",
         "description": "管理广场中公开分享的笔记"
       },
+      "notes": {
+        "title": "笔记管理",
+        "description": "管理所有用户的笔记项目"
+      },
       "users": {
         "title": "用户管理",
         "fakeData": "注：只为演示功能，数据为假数据，封禁功能不可用",
@@ -921,7 +925,8 @@
             "USAGE": "使用积分",
             "EXPIRE": "过期积分",
             "SUBSCRIPTION_RENEWAL": "订阅月度积分",
-            "LIFETIME_MONTHLY": "终身月度积分"
+            "LIFETIME_MONTHLY": "终身月度积分",
+            "REDEMPTION": "兑换码兑换"
           },
           "detailViewer": {
             "title": "积分交易详情",

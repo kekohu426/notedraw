@@ -7,6 +7,7 @@ export enum CREDIT_TRANSACTION_TYPE {
   PURCHASE_PACKAGE = 'PURCHASE_PACKAGE',      // Credits earned by purchase package
   SUBSCRIPTION_RENEWAL = 'SUBSCRIPTION_RENEWAL', // Credits earned by subscription renewal
   LIFETIME_MONTHLY = 'LIFETIME_MONTHLY',      // Credits earned by lifetime plan monthly distribution
+  REDEMPTION = 'REDEMPTION',                  // Credits earned by redemption code
   USAGE = 'USAGE',                            // Credits spent by usage
   EXPIRE = 'EXPIRE',                          // Credits expired
 }
