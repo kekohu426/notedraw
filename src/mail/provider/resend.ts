@@ -23,16 +23,18 @@ export class ResendProvider implements MailProvider {
    */
   constructor() {
     if (!process.env.RESEND_API_KEY) {
-      throw new Error('RESEND_API_KEY environment variable is not set.');
+      console.warn('RESEND_API_KEY environment variable is not set. Email sending will be disabled.');
+      // throw new Error('RESEND_API_KEY environment variable is not set.');
     }
 
     if (!websiteConfig.mail.fromEmail) {
-      throw new Error(
-        'Default from email address is not set in websiteConfig.'
-      );
+      console.warn('Default from email address is not set in websiteConfig. Email sending will be disabled.');
+      // throw new Error(
+      //   'Default from email address is not set in websiteConfig.'
+      // );
     }
 
-    const apiKey = process.env.RESEND_API_KEY;
+    const apiKey = process.env.RESEND_API_KEY || 're_placeholder_key';
     this.resend = new Resend(apiKey);
     this.from = websiteConfig.mail.fromEmail;
   }

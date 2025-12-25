@@ -9,6 +9,18 @@ import { getBaseUrl, getImageUrl, getUrlWithLocale } from './urls/urls';
 /**
  * Construct the metadata object for the current page (in docs/guides)
  */
+/**
+ * Strip query parameters and hash from pathname to ensure clean canonical URLs
+ * e.g., "/blog/post?utm_source=twitter#section" -> "/blog/post"
+ */
+function cleanPathname(pathname: string): string {
+  if (!pathname) return '';
+  // Remove query string and hash
+  const cleanPath = pathname.split('?')[0].split('#')[0];
+  // Remove trailing slash (except for root)
+  return cleanPath === '/' ? cleanPath : cleanPath.replace(/\/$/, '');
+}
+
 export function constructMetadata({
   title,
   description,
@@ -29,17 +41,20 @@ export function constructMetadata({
   image = image || websiteConfig.metadata.images?.ogImage;
   const ogImageUrl = getImageUrl(image || '');
 
+  // Clean pathname: remove query params and hash for canonical URL
+  const cleanedPathname = cleanPathname(pathname || '');
+
   // Generate canonical URL from pathname and locale
   const canonicalUrl = locale
-    ? getUrlWithLocale(pathname || '', locale).replace(/\/$/, '')
+    ? getUrlWithLocale(cleanedPathname, locale).replace(/\/$/, '')
     : undefined;
 
   // Generate hreflang alternates if pathname is provided and we have multiple locales
   const alternates =
-    pathname && routing.locales.length > 1
+    cleanedPathname && routing.locales.length > 1
       ? {
           canonical: canonicalUrl,
-          ...generateAlternates(pathname),
+          ...generateAlternates(cleanedPathname),
         }
       : canonicalUrl
         ? { canonical: canonicalUrl }

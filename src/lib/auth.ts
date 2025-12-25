@@ -70,20 +70,20 @@ export const auth = betterAuth({
     // https://www.better-auth.com/docs/concepts/email#auto-signin-after-verification
     autoSignInAfterVerification: true,
     // https://www.better-auth.com/docs/authentication/email-password#require-email-verification
-    sendVerificationEmail: async ({ user, url, token }, request) => {
-      const locale = getLocaleFromRequest(request);
-      const localizedUrl = getUrlWithLocaleInCallbackUrl(url, locale);
+    // sendVerificationEmail: async ({ user, url, token }, request) => {
+    //   const locale = getLocaleFromRequest(request);
+    //   const localizedUrl = getUrlWithLocaleInCallbackUrl(url, locale);
 
-      await sendEmail({
-        to: user.email,
-        template: 'verifyEmail',
-        context: {
-          url: localizedUrl,
-          name: user.name,
-        },
-        locale,
-      });
-    },
+    //   await sendEmail({
+    //     to: user.email,
+    //     template: 'verifyEmail',
+    //     context: {
+    //       url: localizedUrl,
+    //       name: user.name,
+    //     },
+    //     locale,
+    //   });
+    // },
   },
   socialProviders: {
     // https://www.better-auth.com/docs/authentication/github

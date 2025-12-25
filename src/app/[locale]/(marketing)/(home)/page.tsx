@@ -4,6 +4,7 @@ import HowItWorksSection from '@/components/blocks/notedraw/how-it-works-section
 import ExamplesSection from '@/components/blocks/notedraw/examples-section';
 import PricingSection from '@/components/blocks/pricing/pricing';
 import CrispChat from '@/components/layout/crisp-chat';
+import { SeoHead, getHomePageJsonLd } from '@/components/seo';
 import { constructMetadata } from '@/lib/metadata';
 import type { Metadata } from 'next';
 import type { Locale } from 'next-intl';
@@ -38,6 +39,9 @@ export default async function HomePage(props: HomePageProps) {
 
   return (
     <>
+      {/* JSON-LD 结构化数据：Organization + SoftwareApplication */}
+      <SeoHead jsonLd={getHomePageJsonLd()} />
+
       <div className="flex flex-col">
         {/* Hero - 核心卖点 */}
         <NoteDrawHero />
